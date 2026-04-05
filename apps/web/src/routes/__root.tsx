@@ -4,6 +4,13 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 
+import {
+  EVENT_DATE_LINE,
+  EVENT_LUMA_URL,
+  EVENT_NAME,
+  EVENT_NAME_SHORT,
+  EVENT_VENUE_NAME,
+} from '@base/core/config/event';
 import { Toaster } from '@base/ui/components/sonner';
 import uiCss from '@base/ui/tailwind.css?url';
 
@@ -14,9 +21,8 @@ export const Route = createRootRouteWithContext<{
 }>()({
   head: () => {
     const baseUrl = process.env.APP_BASE_URL || 'https://cursorhackathon.pebbletech.my';
-    const siteTitle = 'MY Hackathon - Cursor x Anthropic';
-    const siteDescription =
-      'Join us for MY Hackathon, a two-day innovation event on December 6-7, 2025 at Monash University Malaysia. Build amazing projects with Cursor and Anthropic.';
+    const siteTitle = `${EVENT_NAME_SHORT} — ${EVENT_NAME}`;
+    const siteDescription = `${EVENT_NAME} on ${EVENT_DATE_LINE} at ${EVENT_VENUE_NAME}, Kuala Lumpur. Co-working, community, and Cursor — details and RSVP on Luma. ${EVENT_LUMA_URL}`;
     const ogImage = `${baseUrl}/cursor-logo.png`;
 
     return {
@@ -33,25 +39,26 @@ export const Route = createRootRouteWithContext<{
         },
         {
           name: 'keywords',
-          content: 'hackathon, cursor, anthropic, monash university, malaysia, coding, innovation, technology',
+          content:
+            'cafe cursor, cursor, kuala lumpur, malaysia, coworking, developer meetup, AI coding, kl tech community',
         },
         {
           name: 'author',
-          content: 'Cursor x Anthropic',
+          content: EVENT_NAME,
         },
         { property: 'og:type', content: 'website' },
         { property: 'og:title', content: siteTitle },
         { property: 'og:description', content: siteDescription },
         { property: 'og:image', content: ogImage },
-        { property: 'og:image:alt', content: 'Cursor x Anthropic Logo' },
+        { property: 'og:image:alt', content: 'Cursor' },
         { property: 'og:url', content: baseUrl },
-        { property: 'og:site_name', content: 'MY Hackathon' },
+        { property: 'og:site_name', content: EVENT_NAME_SHORT },
         { property: 'og:locale', content: 'en_MY' },
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: siteTitle },
         { name: 'twitter:description', content: siteDescription },
         { name: 'twitter:image', content: ogImage },
-        { name: 'twitter:image:alt', content: 'Cursor x Anthropic Logo' },
+        { name: 'twitter:image:alt', content: 'Cursor' },
       ],
       links: [
         { rel: 'stylesheet', href: appCss },

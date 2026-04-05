@@ -5,6 +5,7 @@ import { type ColumnDef } from '@tanstack/react-table';
 import { AlertCircle, Edit2, Loader2, Plus, Power, Trash2 } from 'lucide-react';
 
 import { CheckinTypeCategoryCodes } from '@base/core/config/constant';
+import { EVENT_NAME_SHORT } from '@base/core/config/event';
 import { Button } from '@base/ui/components/button';
 import { DataTable } from '@base/ui/components/data-table';
 import {
@@ -33,7 +34,7 @@ import {
 
 export const Route = createFileRoute('/admin/checkins')({
   head: () => ({
-    meta: [{ title: 'Check-in Types - Admin Portal - MY Hackathon' }],
+    meta: [{ title: `Check-in types — Admin — ${EVENT_NAME_SHORT}` }],
   }),
   component: CheckinTypesPage,
 });

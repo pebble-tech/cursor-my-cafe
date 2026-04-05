@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { Loader2 } from 'lucide-react';
 
+import { EVENT_NAME_SHORT } from '@base/core/config/event';
 import { Button } from '@base/ui/components/button';
 import { Input } from '@base/ui/components/input';
 
@@ -11,7 +12,7 @@ import { getDashboardUrlForUser } from '~/utils/auth-redirect';
 
 export const Route = createFileRoute('/login')({
   head: () => ({
-    meta: [{ title: 'Login - MY Hackathon' }],
+    meta: [{ title: `Login — ${EVENT_NAME_SHORT}` }],
   }),
   beforeLoad: async () => {
     const session = await getServerSession();
@@ -71,7 +72,7 @@ function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
       <div className="w-full max-w-md space-y-8 rounded-xl border border-gray-100 bg-white p-8 shadow-sm">
         <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">Hackathon Platform</h2>
+          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">{EVENT_NAME_SHORT}</h2>
           <p className="mt-2 text-sm text-gray-600">Sign in to access your dashboard</p>
         </div>
 

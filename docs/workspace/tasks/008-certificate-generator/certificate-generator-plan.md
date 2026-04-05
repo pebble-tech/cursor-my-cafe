@@ -1,5 +1,7 @@
 # Certificate Generator Implementation Plan
 
+> **Superseded (April 2026):** Certificate download, name-lock flow, and related routes/components were **removed** from the app. This file is kept only as historical context.
+
 ## Feature Overview
 
 Replace the existing component-based certificate with a template-based certificate generator that:

@@ -1,7 +1,7 @@
 # V1 Development Plan
 
-**Document Date:** December 1, 2025  
-**Event Date:** December 6-7, 2025  
+**Document date:** April 2026  
+**Event:** Cafe Cursor Kuala Lumpur — April 7, 2026 (see `packages/core/src/config/event.ts`)  
 **Reference:** [v1-doc.md](./v1-doc.md)
 
 ---
@@ -381,11 +381,11 @@ Route Structure:
 
 - [x] 6.2 Magic link email template
   - [x] HTML template (mobile-responsive)
-  - [x] Subject: "Sign in to Cursor Hackathon"
+  - [x] Subject: uses `EVENT_NAME_SHORT` (see `config/event.ts`)
   - [x] Link button with 1-hour expiry note
 
 - [x] 6.3 Welcome email template
-  - [x] Subject: "Welcome to Cursor Hackathon!"
+  - [x] Subject: uses `EVENT_NAME` (Cafe Cursor Kuala Lumpur)
   - [x] Platform URL
   - [x] Event date/time info
 
@@ -395,9 +395,9 @@ Route Structure:
   - [x] Embedded QR code image
 
 - [x] 6.5 VIP welcome email (moved to Phase 2)
-  - [x] Subject: "Welcome to Cursor Hackathon - Your VIP Pass"
+  - [x] Subject: uses `EVENT_NAME` (VIP variant in `welcome-vip.ts`)
   - [x] QR code image embedded
-  - [x] Food schedule
+  - [x] Event venue/time (no separate food schedule block in template)
 
 - [x] 6.6 QR code to PNG conversion
   - [x] Generate data URL from QR value (`qr-image.ts`)

@@ -1,4 +1,9 @@
 import { env } from '~/config/env';
+import {
+  EVENT_DATE_LINE,
+  EVENT_NAME,
+  EVENT_VENUE_FULL_ADDRESS,
+} from '~/config/event';
 import { sendEmail } from '~/email/client';
 import { generateQRCodeBuffer } from '~/utils/qr-image';
 
@@ -60,7 +65,7 @@ export async function sendCheckinConfirmationEmail({
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>You're Checked In! - Cursor Hackathon</title>
+  <title>You're checked in! — ${EVENT_NAME}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -72,23 +77,23 @@ export async function sendCheckinConfirmationEmail({
               <div style="display: inline-block; padding: 6px 12px; background-color: #dcfce7; border-radius: 9999px; margin-bottom: 16px;">
                 <span style="font-size: 12px; font-weight: 600; color: #166534;">✓ CHECKED IN</span>
               </div>
-              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #18181b;">You're Checked In!</h1>
+              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #18181b;">You're checked in!</h1>
               <p style="margin: 0 0 20px; font-size: 16px; line-height: 24px; color: #3f3f46;">${greeting},</p>
-              <p style="margin: 0 0 24px; font-size: 16px; line-height: 24px; color: #3f3f46;">Welcome to the Cursor Hackathon! You've been successfully checked in and your credits have been assigned.</p>
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 24px; color: #3f3f46;">Welcome to ${EVENT_NAME}! You've been successfully checked in and your credits have been assigned.</p>
               
               <div style="margin: 28px 0; padding: 20px; background-color: #f8fafc; border-radius: 8px; border-left: 4px solid #18181b;">
-                <p style="margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #18181b;">Event Details</p>
-                <p style="margin: 0 0 4px; font-size: 14px; line-height: 22px; color: #3f3f46;"><strong>Date:</strong> December 6-7, 2025</p>
-                <p style="margin: 0; font-size: 14px; line-height: 22px; color: #3f3f46;"><strong>Venue:</strong> Auditorium 1, Building 9, Monash University Malaysia</p>
+                <p style="margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #18181b;">Event details</p>
+                <p style="margin: 0 0 4px; font-size: 14px; line-height: 22px; color: #3f3f46;"><strong>Date:</strong> ${EVENT_DATE_LINE}</p>
+                <p style="margin: 0; font-size: 14px; line-height: 22px; color: #3f3f46;"><strong>Venue:</strong> ${EVENT_VENUE_FULL_ADDRESS}</p>
               </div>
 
-              <h2 style="margin: 28px 0 12px; font-size: 16px; font-weight: 600; color: #18181b;">Your Credits</h2>
+              <h2 style="margin: 28px 0 12px; font-size: 16px; font-weight: 600; color: #18181b;">Your credits</h2>
               <p style="margin: 0 0 16px; font-size: 15px; line-height: 24px; color: #3f3f46;">You've been assigned ${assignedCodes.length} credit${assignedCodes.length !== 1 ? 's' : ''}. Use these codes to access partner services:</p>
               
               ${creditsSection}
 
-              <h2 style="margin: 28px 0 12px; font-size: 16px; font-weight: 600; color: #18181b;">Your QR Code</h2>
-              <p style="margin: 0 0 16px; font-size: 15px; line-height: 24px; color: #3f3f46;">Show this QR code for check-in at the event. Your QR code is permanent and never expires.</p>
+              <h2 style="margin: 28px 0 12px; font-size: 16px; font-weight: 600; color: #18181b;">Your QR code</h2>
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 24px; color: #3f3f46;">Show this QR code during the event. Your QR code is permanent and never expires.</p>
               
               <div style="text-align: center; padding: 20px; background-color: #fafafa; border-radius: 8px; margin-bottom: 24px;">
                 <img src="cid:${QR_CODE_CONTENT_ID}" alt="Your QR Code" width="200" height="200" style="display: block; margin: 0 auto; border-radius: 4px;" />
@@ -116,13 +121,13 @@ export async function sendCheckinConfirmationEmail({
 
   const text = `${greeting},
 
-You're Checked In!
+You're checked in!
 
-Welcome to the Cursor Hackathon! You've been successfully checked in and your credits have been assigned.
+Welcome to ${EVENT_NAME}! You've been successfully checked in and your credits have been assigned.
 
 EVENT DETAILS
-Date: December 6-7, 2025
-Venue: Auditorium 1, Building 9, Monash University Malaysia
+Date: ${EVENT_DATE_LINE}
+Venue: ${EVENT_VENUE_FULL_ADDRESS}
 
 YOUR CREDITS
 You've been assigned ${assignedCodes.length} credit${assignedCodes.length !== 1 ? 's' : ''}. Use these codes to access partner services:
@@ -130,7 +135,7 @@ You've been assigned ${assignedCodes.length} credit${assignedCodes.length !== 1 
 ${creditsText}
 
 YOUR QR CODE
-Show your QR code for check-in at the event. Your QR code is permanent and never expires.
+Show your QR code during the event. Your QR code is permanent and never expires.
 
 (QR code is embedded in the HTML version of this email. Please view in an email client that supports HTML to see your QR code.)
 
@@ -138,7 +143,7 @@ You can view all your credits and QR code anytime in your dashboard: ${env.APP_B
 
   return sendEmail({
     to,
-    subject: "You're Checked In! - Your Cursor Hackathon Credits",
+    subject: `You're checked in! — your credits for ${EVENT_NAME}`,
     html,
     text,
     attachments: [

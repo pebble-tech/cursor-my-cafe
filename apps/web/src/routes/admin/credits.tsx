@@ -12,6 +12,7 @@ import {
   type CreditCategory,
   type UserRole,
 } from '@base/core/config/constant';
+import { EVENT_NAME_SHORT } from '@base/core/config/event';
 import { Button } from '@base/ui/components/button';
 import { Checkbox } from '@base/ui/components/checkbox';
 import { DataTable } from '@base/ui/components/data-table';
@@ -51,7 +52,7 @@ import { generateSkippedCodesCSV, parseCodesCSV, type ParsedCodeRow } from '~/ut
 
 export const Route = createFileRoute('/admin/credits')({
   head: () => ({
-    meta: [{ title: 'Credits - Admin Portal - MY Hackathon' }],
+    meta: [{ title: `Credits — Admin — ${EVENT_NAME_SHORT}` }],
   }),
   component: CreditsPage,
 });

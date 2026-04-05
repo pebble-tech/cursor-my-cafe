@@ -3,6 +3,7 @@ import { Link, Outlet, createFileRoute, redirect, useLocation } from '@tanstack/
 import { Activity, ClipboardList, Gift, LogOut, Menu, Users } from 'lucide-react';
 
 import { UserRoleEnum } from '@base/core/config/constant';
+import { EVENT_NAME_SHORT } from '@base/core/config/event';
 import { Button } from '@base/ui/components/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@base/ui/components/sheet';
 
@@ -11,7 +12,7 @@ import { authClient } from '~/utils/auth-client';
 
 export const Route = createFileRoute('/admin')({
   head: () => ({
-    meta: [{ title: 'Admin Portal - MY Hackathon' }],
+    meta: [{ title: `Admin Portal — ${EVENT_NAME_SHORT}` }],
   }),
   beforeLoad: async () => {
     const session = await getServerSession();

@@ -1,4 +1,5 @@
 import { env } from '~/config/env';
+import { EVENT_NAME } from '~/config/event';
 import { sendEmail } from '~/email/client';
 
 type GiveawayCode = {
@@ -52,7 +53,7 @@ export function generateGiveawayEmailContent(name: string, codes: GiveawayCode[]
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Credit Assigned - Cursor Hackathon</title>
+  <title>New credit — ${EVENT_NAME}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -64,11 +65,11 @@ export function generateGiveawayEmailContent(name: string, codes: GiveawayCode[]
               <div style="display: inline-block; padding: 6px 12px; background-color: #dbeafe; border-radius: 9999px; margin-bottom: 16px;">
                 <span style="font-size: 12px; font-weight: 600; color: #1e40af;">NEW CREDIT</span>
               </div>
-              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #18181b;">You've Received a New Credit!</h1>
+              <h1 style="margin: 0 0 24px; font-size: 24px; font-weight: 600; color: #18181b;">You've received a new credit!</h1>
               <p style="margin: 0 0 20px; font-size: 16px; line-height: 24px; color: #3f3f46;">${greeting},</p>
-              <p style="margin: 0 0 24px; font-size: 16px; line-height: 24px; color: #3f3f46;">Great news! You've been assigned ${codes.length === 1 ? 'a new credit' : 'new credits'} for the Cursor Hackathon.</p>
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 24px; color: #3f3f46;">Great news! You've been assigned ${codes.length === 1 ? 'a new credit' : 'new credits'} for ${EVENT_NAME}.</p>
               
-              <h2 style="margin: 28px 0 12px; font-size: 16px; font-weight: 600; color: #18181b;">Your New ${codes.length === 1 ? 'Credit' : 'Credits'}</h2>
+              <h2 style="margin: 28px 0 12px; font-size: 16px; font-weight: 600; color: #18181b;">Your new ${codes.length === 1 ? 'credit' : 'credits'}</h2>
               
               ${creditsSection}
 
@@ -94,9 +95,9 @@ export function generateGiveawayEmailContent(name: string, codes: GiveawayCode[]
 
   const text = `${greeting},
 
-You've Received a New Credit!
+You've received a new credit!
 
-Great news! You've been assigned ${codes.length === 1 ? 'a new credit' : 'new credits'} for the Cursor Hackathon.
+Great news! You've been assigned ${codes.length === 1 ? 'a new credit' : 'new credits'} for ${EVENT_NAME}.
 
 YOUR NEW ${codes.length === 1 ? 'CREDIT' : 'CREDITS'}
 ${creditsText}
@@ -106,7 +107,7 @@ You can view all your credits anytime in your dashboard: ${env.APP_BASE_URL}/das
   return { html, text };
 }
 
-export const GIVEAWAY_EMAIL_SUBJECT = "You've Received a New Credit! - Cursor Hackathon";
+export const GIVEAWAY_EMAIL_SUBJECT = `You've received a new credit! — ${EVENT_NAME}`;
 
 export async function sendGiveawayNotificationEmail({ to, name, codes }: SendGiveawayNotificationEmailParams) {
   const { html, text } = generateGiveawayEmailContent(name, codes);

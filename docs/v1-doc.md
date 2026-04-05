@@ -1,17 +1,17 @@
-## Cursor x Anthropic MY Hackathon Platform
+## Cafe Cursor Kuala Lumpur — event platform
 
 ## Requirements Documentation v1.0
 
-**Document Date:** December 1, 2025  
-**Event Date:** December 6-7, 2025  
-**Expected Participants:** ~1,000  
-**Location:** Monash University Malaysia, Auditorium 1, Building 9
+**Document date:** April 2026  
+**Event date:** April 7, 2026  
+**Public listing:** https://luma.com/z3o7i2m8  
+**Venue:** Afloat Coffee Roaster, Kuala Lumpur, Malaysia  
 
 ---
 
 ## Executive Summary
 
-The Cursor x Anthropic MY Hackathon Platform is a comprehensive event management system designed to streamline participant registration, check-in, credit distribution, and food voucher management for a 1,000-person hackathon event.
+This repo powers check-in, credits, and participant communications for **Cafe Cursor Kuala Lumpur** — a Cursor community coworking/meetup (not the former Monash hackathon). The same platform patterns apply: QR check-in, sponsor credits, ops scanning, and admin import. **PDF/electronic certificates are not part of the product** (removed); participant display names come from import/admin only unless a future profile edit is added.
 
 ### Primary Objectives
 
@@ -231,7 +231,7 @@ Prevents Duplicates
 
 ## Phase 1: Core Features (MVP)
 
-These features are required for the event to function successfully on December 6-7, 2025.
+These features are required for the event to function successfully on the scheduled event date (see `packages/core/src/config/event.ts` for current public copy).
 
 ### 1. Participant Management
 
@@ -263,26 +263,16 @@ sarah@example.com,Sarah Lee,luma_def456
 - Name must not be empty
 - Luma ID optional but recommended
 
-**Welcome Email Template:**
+**Welcome Email Template:** (actual copy in `packages/core/src/email/templates/welcome.ts`)
 
 ```
-Subject: Welcome to Cursor x Anthropic MY Hackathon!
+Subject: Welcome to Cafe Cursor Kuala Lumpur!
 
 Hi [Name],
 
-You're registered for Cursor x Anthropic MY Hackathon! 🎉
+You're registered for Cafe Cursor Kuala Lumpur.
 
-📱 Access your dashboard:
-[Platform URL]
-
-Login with this email to:
-• View your check-in QR code
-• Access your credits after check-in on Dec 6
-
-📍 Check-in opens: Dec 6, 9:00 AM at Auditorium 1, Building 9, Monash University
-
-See you soon! 🚀
-The Hackathon Team
+Event details, venue, and Luma link are in the HTML email; use [Platform URL]/login with this email.
 ```
 
 #### 1.2 VIP Management
@@ -306,28 +296,7 @@ The Hackathon Team
 - Special badge shown to ops during scans
 - Food access only (no hackathon credits)
 
-**VIP Check-in Email:**
-
-```
-Subject: Welcome VIP - Cursor x Anthropic MY Hackathon
-
-Hi [Name],
-
-Welcome to Cursor x Anthropic MY Hackathon! 🌟
-
-🍽️ YOUR VIP FOOD ACCESS
-
-[QR Code Image Embedded]
-
-Show this QR code at food stations for:
-• Lunch (Dec 6, 12:00 PM)
-• Dinner (Dec 6, 6:00 PM)
-• Breakfast (Dec 7, 9:00 AM)
-
-Your QR code never expires. Keep this email handy!
-
-Enjoy the event! 🚀
-```
+**VIP welcome email:** See `packages/core/src/email/templates/welcome-vip.ts` — same **Cafe Cursor Kuala Lumpur** venue/date as regular welcome; QR embedded for check-in.
 
 ### 2. Authentication System
 
@@ -595,7 +564,7 @@ Subject: You're Checked In! 🎉
 
 Hi [Name],
 
-Welcome to Cursor x Anthropic MY Hackathon! You're all checked in. ✓
+Welcome to Cafe Cursor Kuala Lumpur! You're all checked in. ✓
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📦 YOUR CREDITS
@@ -1069,7 +1038,7 @@ CREATE TABLE checkin_records (
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ Cursor x Anthropic MY Hackathon                     │
+│ Cafe Cursor Kuala Lumpur                            │
 │ Admin Dashboard                                     │
 ├─────────────────────────────────────────────────────┤
 │ Quick Stats:                                        │

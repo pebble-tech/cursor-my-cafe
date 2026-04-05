@@ -2,13 +2,20 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { CalendarDays, MapPin } from 'lucide-react';
 
 import { UserRoleEnum } from '@base/core/config/constant';
+import {
+  EVENT_DATE_LINE,
+  EVENT_LUMA_URL,
+  EVENT_NAME,
+  EVENT_NAME_SHORT,
+  EVENT_VENUE_SINGLE_LINE,
+} from '@base/core/config/event';
 import { Button } from '@base/ui/components/button';
 
 import { getServerSession, type User } from '~/apis/auth';
 
 export const Route = createFileRoute('/')({
   head: () => ({
-    meta: [{ title: 'MY Hackathon - Cursor x Anthropic' }],
+    meta: [{ title: `${EVENT_NAME_SHORT} — ${EVENT_NAME}` }],
   }),
   beforeLoad: async () => {
     const session = await getServerSession();
@@ -32,25 +39,27 @@ function IndexComponent() {
             <img src="/cursor-logo.png" alt="Cursor" className="h-10 w-10" />
           </div>
 
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Cursor x Anthropic
-            <br />
-            MY Hackathon
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">{EVENT_NAME}</h1>
         </div>
 
         <div className="space-y-3 text-gray-600">
           <div className="flex items-center justify-center gap-2">
-            <CalendarDays className="h-5 w-5" />
-            <span className="text-lg">December 6-7, 2025</span>
+            <CalendarDays className="h-5 w-5 shrink-0" />
+            <span className="text-lg">{EVENT_DATE_LINE}</span>
           </div>
           <div className="flex items-center justify-center gap-2">
-            <MapPin className="h-5 w-5" />
-            <span className="text-lg">Monash University Malaysia, Auditorium 1, Building 9</span>
+            <MapPin className="h-5 w-5 shrink-0" />
+            <span className="text-lg">{EVENT_VENUE_SINGLE_LINE}</span>
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-3 pt-4">
+          <Button size="lg" variant="outline" className="w-full max-w-xs text-base" asChild>
+            <a href={EVENT_LUMA_URL} target="_blank" rel="noopener noreferrer">
+              Event on Luma
+            </a>
+          </Button>
+
           {!user && (
             <Button size="lg" className="w-full max-w-xs text-base" onClick={() => navigate({ to: '/login' })}>
               Login

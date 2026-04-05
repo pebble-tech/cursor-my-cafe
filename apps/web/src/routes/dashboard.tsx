@@ -1,27 +1,27 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
-import { Award, Check, Copy, ExternalLink, Eye, Info, LogOut, QrCode, Ticket } from 'lucide-react';
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { Check, Copy, ExternalLink, Info, LogOut, QrCode, Ticket } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { ParticipantStatusEnum, UserRoleEnum } from '@base/core/config/constant';
+import { EVENT_NAME_SHORT } from '@base/core/config/event';
 import { Badge } from '@base/ui/components/badge';
 import { Button } from '@base/ui/components/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@base/ui/components/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@base/ui/components/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@base/ui/components/tabs';
 
-import { CertificateNameEditor } from '~/components/certificate-name-editor';
 import { QRCodeDisplay } from '~/components/qr-code-display';
 import { getServerSession } from '~/apis/auth';
-import { getParticipantDashboard, markCreditRedeemed, updateProfileName } from '~/apis/participant/dashboard';
+import { getParticipantDashboard, markCreditRedeemed } from '~/apis/participant/dashboard';
 import { authClient } from '~/utils/auth-client';
 import { getDashboardUrlForUser } from '~/utils/auth-redirect';
 import { categoryIcons } from '~/utils/credit-category-icons';
 
 export const Route = createFileRoute('/dashboard')({
   head: () => ({
-    meta: [{ title: 'Dashboard - MY Hackathon' }],
+    meta: [{ title: `Dashboard — ${EVENT_NAME_SHORT}` }],
   }),
   beforeLoad: async () => {
     const session = await getServerSession();
@@ -42,7 +42,6 @@ export const Route = createFileRoute('/dashboard')({
 
 function DashboardPage() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['participant-dashboard'],
@@ -59,17 +58,6 @@ function DashboardPage() {
     },
     onError: () => {
       toast.error('Failed to update');
-    },
-  });
-
-  const nameUpdateMutation = useMutation({
-    mutationFn: (name: string) => updateProfileName({ data: { name } }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['participant-dashboard'] });
-      toast.success('Name updated');
-    },
-    onError: () => {
-      toast.error('Failed to update name');
     },
   });
 
@@ -120,7 +108,7 @@ function DashboardPage() {
 
       <main className="mx-auto max-w-2xl px-4 py-6">
         <Tabs defaultValue="qr" className="w-full">
-          <TabsList className="mb-6 grid w-full grid-cols-3">
+          <TabsList className="mb-6 grid w-full grid-cols-2">
             <TabsTrigger value="qr" className="gap-2">
               <QrCode className="h-4 w-4" />
               My QR Code
@@ -133,10 +121,6 @@ function DashboardPage() {
                   {pendingCreditsCount}
                 </Badge>
               )}
-            </TabsTrigger>
-            <TabsTrigger value="certificate" className="gap-2" disabled={!isCheckedIn}>
-              <Award className="h-4 w-4" />
-              Certificate
             </TabsTrigger>
           </TabsList>
 
@@ -183,44 +167,6 @@ function DashboardPage() {
                     credits={credits}
                     onMarkRedeemed={(codeId, redeemed) => redeemMutation.mutate({ data: { codeId, redeemed } })}
                   />
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="certificate">
-            <Card>
-              <CardHeader className="text-center">
-                <CardTitle className="text-base font-medium text-gray-500">Your Certificate</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-6">
-                {isCheckedIn ? (
-                  <>
-                    <CertificateNameEditor
-                      currentName={user.name}
-                      onSave={async (newName) => {
-                        await nameUpdateMutation.mutateAsync(newName);
-                      }}
-                      isSaving={nameUpdateMutation.isPending}
-                      isLocked={user.isNameUpdated ?? false}
-                    />
-                    {user.isNameUpdated ? (
-                      <Button onClick={() => navigate({ to: '/certificate' })}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View & Download Certificate
-                      </Button>
-                    ) : (
-                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center">
-                        <p className="text-sm text-amber-800">
-                          Please save your certificate name above before viewing and downloading your certificate.
-                        </p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="rounded-lg bg-gray-50 p-8 text-center">
-                    <p className="text-gray-600">Check in at the event to unlock your certificate</p>
-                  </div>
                 )}
               </CardContent>
             </Card>

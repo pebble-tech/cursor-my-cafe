@@ -1,4 +1,4 @@
-# Scratchpad - Hackathon Platform Requirements
+# Scratchpad - Cafe Cursor KL platform (historical flows; align copy with `config/event.ts`)
 
 ## Understanding from wireframes
 
@@ -32,7 +32,7 @@
 5. Backend reveals all codes: status hidden → available, revealed_at = timestamp
 6. Backend triggers email via Resend:
 
-   Subject: Welcome to Cursor x Anthropic MY Hackathon!
+   Subject: Welcome to Cafe Cursor Kuala Lumpur!
 
    Body:
    - Welcome message
@@ -64,7 +64,7 @@
 4. Backend generates permanent QR code (qr_expires = false)
 5. Backend triggers email via Resend:
 
-   Subject: Welcome VIP - Cursor x Anthropic MY Hackathon
+   Subject: Welcome VIP - Cafe Cursor Kuala Lumpur
 
    Body:
    - Welcome message

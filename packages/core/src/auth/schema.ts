@@ -26,7 +26,6 @@ export const UsersTable = pgTable(
     checkedInBy: text('checked_in_by'),
     qrCodeValue: text('qr_code_value'),
     welcomeEmailSentAt: timestamp('welcome_email_sent_at'),
-    isNameUpdated: boolean('is_name_updated').default(false).notNull(),
   },
   (table) => [
     index('users_luma_id_idx').on(table.lumaId),
