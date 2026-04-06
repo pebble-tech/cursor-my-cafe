@@ -65,10 +65,17 @@ function CheckinTypesPage() {
     queryFn: () => listCheckinTypes(),
   });
 
-  const { data: ticketTypesData } = useQuery({
+  const {
+    data: ticketTypesData,
+    isLoading: ticketTypesLoading,
+    isError: ticketTypesQueryFailed,
+    error: ticketTypesQueryError,
+  } = useQuery({
     queryKey: ['ticket-types'],
     queryFn: () => listTicketTypes(),
   });
+
+  const ticketTypesBlockingSubmit = ticketTypesLoading || ticketTypesQueryFailed;
 
   const createMutation = useMutation({
     mutationFn: (input: CreateCheckinTypeInput) => createCheckinType({ data: input }),
@@ -290,6 +297,8 @@ function CheckinTypesPage() {
               formData={formData}
               setFormData={setFormData}
               ticketTypes={ticketTypesData?.ticketTypes ?? []}
+              ticketTypesLoading={ticketTypesLoading}
+              ticketTypesQueryError={ticketTypesQueryFailed ? (ticketTypesQueryError as Error) : null}
               error={createMutation.error as Error | null}
             />
 
@@ -297,7 +306,10 @@ function CheckinTypesPage() {
               <DialogClose asChild>
                 <Button variant="outline">Cancel</Button>
               </DialogClose>
-              <Button onClick={handleCreate} disabled={!formData.name || createMutation.isPending}>
+              <Button
+                onClick={handleCreate}
+                disabled={!formData.name || createMutation.isPending || ticketTypesBlockingSubmit}
+              >
                 {createMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -344,6 +356,8 @@ function CheckinTypesPage() {
             formData={formData}
             setFormData={setFormData}
             ticketTypes={ticketTypesData?.ticketTypes ?? []}
+            ticketTypesLoading={ticketTypesLoading}
+            ticketTypesQueryError={ticketTypesQueryFailed ? (ticketTypesQueryError as Error) : null}
             error={updateMutation.error as Error | null}
           />
 
@@ -351,7 +365,10 @@ function CheckinTypesPage() {
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button onClick={handleEdit} disabled={!formData.name || updateMutation.isPending}>
+            <Button
+              onClick={handleEdit}
+              disabled={!formData.name || updateMutation.isPending || ticketTypesBlockingSubmit}
+            >
               {updateMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -435,10 +452,19 @@ type CheckinTypeFormProps = {
     }>
   >;
   ticketTypes: Array<{ id: string; name: string; code: string }>;
+  ticketTypesLoading: boolean;
+  ticketTypesQueryError: Error | null;
   error: Error | null;
 };
 
-function CheckinTypeForm({ formData, setFormData, ticketTypes, error }: CheckinTypeFormProps) {
+function CheckinTypeForm({
+  formData,
+  setFormData,
+  ticketTypes,
+  ticketTypesLoading,
+  ticketTypesQueryError,
+  error,
+}: CheckinTypeFormProps) {
   return (
     <div className="space-y-4 py-4">
       <div className="space-y-2">
@@ -507,7 +533,17 @@ function CheckinTypeForm({ formData, setFormData, ticketTypes, error }: CheckinT
       <div className="space-y-2">
         <label className="text-sm font-medium">Allowed ticket types</label>
         <p className="text-xs text-gray-500">Leave none selected for all tickets. Otherwise only linked ticket types may use this check-in.</p>
-        {ticketTypes.length === 0 ? (
+        {ticketTypesLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading ticket types…
+          </div>
+        ) : ticketTypesQueryError ? (
+          <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            Failed to load ticket types: {ticketTypesQueryError.message}. Close and retry.
+          </div>
+        ) : ticketTypes.length === 0 ? (
           <p className="text-sm text-amber-700">Create ticket types first to restrict eligibility.</p>
         ) : (
           <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">
