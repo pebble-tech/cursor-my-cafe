@@ -50,6 +50,13 @@ export const createTicketType = createServerFn({ method: 'POST' })
       throw new Error('A ticket type with this code already exists');
     }
 
+    const existingName = await db.query.ticketTypes.findFirst({
+      where: eq(TicketTypesTable.name, payload.name),
+    });
+    if (existingName) {
+      throw new Error('A ticket type with this name already exists');
+    }
+
     const existingLuma = await db.query.ticketTypes.findFirst({
       where: eq(TicketTypesTable.lumaTicketTypeId, payload.lumaTicketTypeId),
     });
@@ -121,6 +128,19 @@ export const updateTicketType = createServerFn({ method: 'POST' })
       if (taken && taken.id !== id) {
         throw new Error('A ticket type with this Luma ticket type ID already exists');
       }
+    }
+
+    if (patch.name !== undefined) {
+      const taken = await db.query.ticketTypes.findFirst({
+        where: eq(TicketTypesTable.name, patch.name),
+      });
+      if (taken && taken.id !== id) {
+        throw new Error('A ticket type with this name already exists');
+      }
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return { ticketType: current };
     }
 
     const [updated] = await db

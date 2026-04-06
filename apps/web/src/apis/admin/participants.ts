@@ -36,6 +36,12 @@ function buildTicketTypeLookupMaps(
   const byName = new Map<string, string>();
   for (const t of ticketTypes) {
     byLumaId.set(t.lumaTicketTypeId, t.id);
+    const existingId = byName.get(t.name);
+    if (existingId !== undefined && existingId !== t.id) {
+      throw new Error(
+        `Ambiguous ticket type name "${t.name}": multiple active ticket types share this name. Rename one before importing.`
+      );
+    }
     byName.set(t.name, t.id);
   }
   return { byLumaId, byName };

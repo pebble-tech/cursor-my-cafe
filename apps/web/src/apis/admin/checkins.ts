@@ -45,8 +45,8 @@ async function loadTicketEligibilityByCheckinType(
   for (const row of rows) {
     const cur = map.get(row.checkinTypeId) ?? { ids: [], names: [], linkCount: 0 };
     cur.linkCount += 1;
+    cur.ids.push(row.ticketTypeId);
     if (row.isActive) {
-      cur.ids.push(row.ticketTypeId);
       cur.names.push(row.ticketTypeName);
     }
     map.set(row.checkinTypeId, cur);
