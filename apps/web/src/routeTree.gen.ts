@@ -15,12 +15,10 @@ import { Route as OpsRouteImport } from './routes/ops'
 import { Route as LoginSuccessRouteImport } from './routes/login-success'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as CertificateRouteImport } from './routes/certificate'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OpsIndexRouteImport } from './routes/ops/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as OpsCertificateRouteImport } from './routes/ops/certificate'
 import { Route as AdminParticipantsRouteImport } from './routes/admin/participants'
 import { Route as AdminCreditsRouteImport } from './routes/admin/credits'
 import { Route as AdminCheckinsRouteImport } from './routes/admin/checkins'
@@ -48,11 +46,6 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CertificateRoute = CertificateRouteImport.update({
-  id: '/certificate',
-  path: '/certificate',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -72,11 +65,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
-} as any)
-const OpsCertificateRoute = OpsCertificateRouteImport.update({
-  id: '/certificate',
-  path: '/certificate',
-  getParentRoute: () => OpsRoute,
 } as any)
 const AdminParticipantsRoute = AdminParticipantsRouteImport.update({
   id: '/participants',
@@ -102,7 +90,6 @@ const ApiAuthSplatServerRoute = ApiAuthSplatServerRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/certificate': typeof CertificateRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/login-success': typeof LoginSuccessRoute
@@ -110,20 +97,17 @@ export interface FileRoutesByFullPath {
   '/admin/checkins': typeof AdminCheckinsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/participants': typeof AdminParticipantsRoute
-  '/ops/certificate': typeof OpsCertificateRoute
   '/admin/': typeof AdminIndexRoute
   '/ops/': typeof OpsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/certificate': typeof CertificateRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/login-success': typeof LoginSuccessRoute
   '/admin/checkins': typeof AdminCheckinsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/participants': typeof AdminParticipantsRoute
-  '/ops/certificate': typeof OpsCertificateRoute
   '/admin': typeof AdminIndexRoute
   '/ops': typeof OpsIndexRoute
 }
@@ -131,7 +115,6 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/certificate': typeof CertificateRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/login-success': typeof LoginSuccessRoute
@@ -139,7 +122,6 @@ export interface FileRoutesById {
   '/admin/checkins': typeof AdminCheckinsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/participants': typeof AdminParticipantsRoute
-  '/ops/certificate': typeof OpsCertificateRoute
   '/admin/': typeof AdminIndexRoute
   '/ops/': typeof OpsIndexRoute
 }
@@ -148,7 +130,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
-    | '/certificate'
     | '/dashboard'
     | '/login'
     | '/login-success'
@@ -156,27 +137,23 @@ export interface FileRouteTypes {
     | '/admin/checkins'
     | '/admin/credits'
     | '/admin/participants'
-    | '/ops/certificate'
     | '/admin/'
     | '/ops/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/certificate'
     | '/dashboard'
     | '/login'
     | '/login-success'
     | '/admin/checkins'
     | '/admin/credits'
     | '/admin/participants'
-    | '/ops/certificate'
     | '/admin'
     | '/ops'
   id:
     | '__root__'
     | '/'
     | '/admin'
-    | '/certificate'
     | '/dashboard'
     | '/login'
     | '/login-success'
@@ -184,7 +161,6 @@ export interface FileRouteTypes {
     | '/admin/checkins'
     | '/admin/credits'
     | '/admin/participants'
-    | '/ops/certificate'
     | '/admin/'
     | '/ops/'
   fileRoutesById: FileRoutesById
@@ -192,7 +168,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
-  CertificateRoute: typeof CertificateRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   LoginSuccessRoute: typeof LoginSuccessRoute
@@ -250,13 +225,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/certificate': {
-      id: '/certificate'
-      path: '/certificate'
-      fullPath: '/certificate'
-      preLoaderRoute: typeof CertificateRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -284,13 +252,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
-    }
-    '/ops/certificate': {
-      id: '/ops/certificate'
-      path: '/certificate'
-      fullPath: '/ops/certificate'
-      preLoaderRoute: typeof OpsCertificateRouteImport
-      parentRoute: typeof OpsRoute
     }
     '/admin/participants': {
       id: '/admin/participants'
@@ -344,12 +305,10 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface OpsRouteChildren {
-  OpsCertificateRoute: typeof OpsCertificateRoute
   OpsIndexRoute: typeof OpsIndexRoute
 }
 
 const OpsRouteChildren: OpsRouteChildren = {
-  OpsCertificateRoute: OpsCertificateRoute,
   OpsIndexRoute: OpsIndexRoute,
 }
 
@@ -358,7 +317,6 @@ const OpsRouteWithChildren = OpsRoute._addFileChildren(OpsRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
-  CertificateRoute: CertificateRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   LoginSuccessRoute: LoginSuccessRoute,
