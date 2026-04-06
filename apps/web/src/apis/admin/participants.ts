@@ -308,6 +308,23 @@ export const importParticipants = createServerFn({ method: 'POST' })
 
     const existingByEmail = new Map(existingUsers.map((u) => [u.email, u]));
 
+    const importLumaIds = [
+      ...new Set(
+        canonicalList.map((c) => c.lumaId?.trim()).filter((id): id is string => Boolean(id))
+      ),
+    ];
+    const dbLumaOwners =
+      importLumaIds.length === 0
+        ? []
+        : await db
+            .select({ id: UsersTable.id, lumaId: UsersTable.lumaId })
+            .from(UsersTable)
+            .where(inArray(UsersTable.lumaId, importLumaIds));
+    const lumaIdToUserId = new Map(
+      dbLumaOwners.flatMap((r) => (r.lumaId ? ([[r.lumaId, r.id]] as const) : []))
+    );
+    const importLumaClaim = new Map<string, string>();
+
     const toInsert: (typeof UsersTable.$inferInsert)[] = [];
     const toUpdate: Array<{
       id: string;
@@ -329,9 +346,35 @@ export const importParticipants = createServerFn({ method: 'POST' })
         role = UserRoleEnum.ops;
       } else if (c.userType === UserTypeEnum.admin) {
         role = UserRoleEnum.admin;
-      } else if (c.userType === UserTypeEnum.regular) {
+      } else       if (c.userType === UserTypeEnum.regular) {
         role = UserRoleEnum.participant;
         participantType = ParticipantTypeEnum.regular;
+      }
+
+      const lum = c.lumaId?.trim() || null;
+      if (lum) {
+        const ownerInDb = lumaIdToUserId.get(lum);
+        if (ownerInDb !== undefined && ownerInDb !== existing?.id) {
+          for (const rowNum of c.rowNumbers) {
+            skipped.push({
+              row: rowNum,
+              email: normalizedEmail,
+              reason: 'Luma ID already assigned to another participant',
+            });
+          }
+          return;
+        }
+        const claimedByEmail = importLumaClaim.get(lum);
+        if (claimedByEmail !== undefined && claimedByEmail !== normalizedEmail) {
+          for (const rowNum of c.rowNumbers) {
+            skipped.push({
+              row: rowNum,
+              email: normalizedEmail,
+              reason: 'Duplicate Luma ID in import file',
+            });
+          }
+          return;
+        }
       }
 
       if (existing) {
@@ -345,7 +388,7 @@ export const importParticipants = createServerFn({ method: 'POST' })
           }
           return;
         }
-        const nextLumaId = c.lumaId?.trim() ? c.lumaId.trim() : (existing.lumaId ?? null);
+        const nextLumaId = lum ?? existing.lumaId ?? null;
         const update = buildImportParticipantUpdate(
           {
             name: existing.name,
@@ -361,6 +404,9 @@ export const importParticipants = createServerFn({ method: 'POST' })
         );
         if (update) {
           toUpdate.push(update);
+          if (update.lumaId) {
+            importLumaClaim.set(update.lumaId, normalizedEmail);
+          }
         }
         return;
       }
@@ -376,10 +422,13 @@ export const importParticipants = createServerFn({ method: 'POST' })
         role,
         participantType,
         status: ParticipantStatusEnum.registered,
-        lumaId: c.lumaId?.trim() ? c.lumaId.trim() : null,
+        lumaId: lum,
         qrCodeValue,
         ticketTypeId: c.ticketTypeId,
       });
+      if (lum) {
+        importLumaClaim.set(lum, normalizedEmail);
+      }
     });
 
     let inserted = 0;

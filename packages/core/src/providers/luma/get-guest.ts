@@ -40,6 +40,18 @@ export async function lookupLumaGuestByCheckInKey(input: {
 
   const url = `${LUMA_API_BASE}/v1/event/get-guest?${params.toString()}`;
 
+  const timeoutMs = 10_000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (input.signal) {
+    if (input.signal.aborted) {
+      controller.abort();
+    } else {
+      input.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+
   let response: Response;
   try {
     response = await fetch(url, {
@@ -48,11 +60,13 @@ export async function lookupLumaGuestByCheckInKey(input: {
         'x-luma-api-key': input.apiKey,
         Accept: 'application/json',
       },
-      signal: input.signal,
+      signal: controller.signal,
     });
   } catch (err) {
     logWarning('Luma get-guest request failed', { cause: err instanceof Error ? err.message : 'unknown' });
     return { ok: false, code: 'unavailable' };
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   if (response.status === 401 || response.status === 403) {
