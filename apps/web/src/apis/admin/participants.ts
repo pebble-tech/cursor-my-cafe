@@ -52,20 +52,26 @@ function resolveTicketTypeIdForImport(
 ): { ticketTypeId: string | null; error?: string } {
   const luma = p.ticketLumaTypeId?.trim();
   const name = p.ticketName?.trim();
-  if (luma) {
-    const id = byLumaId.get(luma);
-    if (!id) {
-      return { ticketTypeId: null, error: `Unknown ticket_type_id: ${luma}` };
-    }
-    return { ticketTypeId: id };
+
+  const idFromLuma = luma ? byLumaId.get(luma) : undefined;
+  const idFromName = name ? byName.get(name) : undefined;
+
+  if (luma && idFromLuma === undefined) {
+    return { ticketTypeId: null, error: `Unknown ticket_type_id: ${luma}` };
   }
-  if (name) {
-    const id = byName.get(name);
-    if (!id) {
-      return { ticketTypeId: null, error: `Unknown ticket_name: ${name}` };
-    }
-    return { ticketTypeId: id };
+  if (name && idFromName === undefined) {
+    return { ticketTypeId: null, error: `Unknown ticket_name: ${name}` };
   }
+  if (idFromLuma !== undefined && idFromName !== undefined && idFromLuma !== idFromName) {
+    return { ticketTypeId: null, error: 'Conflicting ticket_type_id and ticket_name for this row' };
+  }
+  if (idFromLuma !== undefined) {
+    return { ticketTypeId: idFromLuma };
+  }
+  if (idFromName !== undefined) {
+    return { ticketTypeId: idFromName };
+  }
+
   if (p.userType === UserTypeEnum.regular) {
     return { ticketTypeId: null, error: 'Ticket metadata required for regular participants' };
   }

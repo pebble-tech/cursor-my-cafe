@@ -27,7 +27,7 @@ export const UsersTable = pgTable(
     checkedInBy: text('checked_in_by'),
     qrCodeValue: text('qr_code_value'),
     welcomeEmailSentAt: timestamp('welcome_email_sent_at'),
-    ticketTypeId: text('ticket_type_id').references(() => TicketTypesTable.id, { onDelete: 'set null' }),
+    ticketTypeId: text('ticket_type_id').references(() => TicketTypesTable.id, { onDelete: 'restrict' }),
   },
   (table) => [
     index('users_ticket_type_id_idx').on(table.ticketTypeId),

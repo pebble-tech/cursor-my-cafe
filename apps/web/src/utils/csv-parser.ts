@@ -80,7 +80,7 @@ export function parseParticipantsCSV(csvContent: string): CSVParseResult {
     const userTypeRaw = (row['user_type'] || row['usertype'] || row['type'] || 'regular').trim().toLowerCase();
 
     const ticketTypeIdCol =
-      (row['ticket_type_id'] || row['ticket_type id'] || '').trim() ||
+      (row['ticket_type_id'] || row['ticket type id'] || '').trim() ||
       (row['lumatickettypeid'] || '').trim();
     const ticketLumaTypeId =
       ticketTypeIdCol ||

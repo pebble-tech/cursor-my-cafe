@@ -38,20 +38,32 @@ export const listCheckinTypes = createServerFn({ method: 'GET' }).handler(async 
       .select({
         checkinTypeId: CheckinTypeTicketTypesTable.checkinTypeId,
         ticketName: TicketTypesTable.name,
+        isActive: TicketTypesTable.isActive,
       })
       .from(CheckinTypeTicketTypesTable)
       .innerJoin(TicketTypesTable, eq(CheckinTypeTicketTypesTable.ticketTypeId, TicketTypesTable.id))
       .where(inArray(CheckinTypeTicketTypesTable.checkinTypeId, ids));
 
     const namesByCt = new Map<string, string[]>();
+    const linkCountByCt = new Map<string, number>();
     for (const row of rows) {
-      const arr = namesByCt.get(row.checkinTypeId) ?? [];
-      arr.push(row.ticketName);
-      namesByCt.set(row.checkinTypeId, arr);
+      linkCountByCt.set(row.checkinTypeId, (linkCountByCt.get(row.checkinTypeId) ?? 0) + 1);
+      if (row.isActive) {
+        const arr = namesByCt.get(row.checkinTypeId) ?? [];
+        arr.push(row.ticketName);
+        namesByCt.set(row.checkinTypeId, arr);
+      }
     }
     for (const id of ids) {
+      const linkCount = linkCountByCt.get(id) ?? 0;
       const names = namesByCt.get(id);
-      summaryByCheckinType.set(id, names?.length ? names.join(', ') : 'All tickets');
+      if (linkCount === 0) {
+        summaryByCheckinType.set(id, 'All tickets');
+      } else if (!names?.length) {
+        summaryByCheckinType.set(id, 'Restricted (no active ticket types)');
+      } else {
+        summaryByCheckinType.set(id, names.join(', '));
+      }
     }
   }
 

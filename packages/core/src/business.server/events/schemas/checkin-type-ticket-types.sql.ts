@@ -13,7 +13,7 @@ export const CheckinTypeTicketTypesTable = pgTable(
       .references(() => CheckinTypesTable.id, { onDelete: 'cascade' }),
     ticketTypeId: text('ticket_type_id')
       .notNull()
-      .references(() => TicketTypesTable.id, { onDelete: 'cascade' }),
+      .references(() => TicketTypesTable.id, { onDelete: 'restrict' }),
     ...timestamps,
   },
   (table) => [uniqueIndex('checkin_type_ticket_types_pair_unique').on(table.checkinTypeId, table.ticketTypeId)]

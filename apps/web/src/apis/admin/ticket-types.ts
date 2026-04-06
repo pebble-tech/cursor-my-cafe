@@ -2,7 +2,10 @@ import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 
 import { UsersTable } from '@base/core/auth/schema';
-import { TicketTypesTable } from '@base/core/business.server/events/schemas/schema';
+import {
+  CheckinTypeTicketTypesTable,
+  TicketTypesTable,
+} from '@base/core/business.server/events/schemas/schema';
 import { asc, count, db, eq } from '@base/core/drizzle.server';
 
 import { requireAdmin } from '~/apis/auth';
@@ -139,6 +142,18 @@ export const deleteTicketType = createServerFn({ method: 'POST' })
   .validator((data: DeleteTicketTypeInput) => deleteTicketTypeInputSchema.parse(data))
   .handler(async ({ data }) => {
     await requireAdmin();
+
+    const linkCountResult = await db
+      .select({ count: count() })
+      .from(CheckinTypeTicketTypesTable)
+      .where(eq(CheckinTypeTicketTypesTable.ticketTypeId, data.id));
+
+    const linkCount = linkCountResult[0]?.count ?? 0;
+    if (linkCount > 0) {
+      throw new Error(
+        `Cannot delete ticket type: ${linkCount} check-in eligibility link(s) still reference it. Remove it from check-in types first.`
+      );
+    }
 
     const userCountResult = await db
       .select({ count: count() })

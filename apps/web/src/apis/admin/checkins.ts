@@ -27,8 +27,8 @@ export type CheckinTypeListItem = {
 
 async function loadTicketEligibilityByCheckinType(
   checkinTypeIds: string[]
-): Promise<Map<string, { ids: string[]; names: string[] }>> {
-  const map = new Map<string, { ids: string[]; names: string[] }>();
+): Promise<Map<string, { ids: string[]; names: string[]; linkCount: number }>> {
+  const map = new Map<string, { ids: string[]; names: string[]; linkCount: number }>();
   if (checkinTypeIds.length === 0) return map;
 
   const rows = await db
@@ -36,19 +36,29 @@ async function loadTicketEligibilityByCheckinType(
       checkinTypeId: CheckinTypeTicketTypesTable.checkinTypeId,
       ticketTypeId: TicketTypesTable.id,
       ticketTypeName: TicketTypesTable.name,
+      isActive: TicketTypesTable.isActive,
     })
     .from(CheckinTypeTicketTypesTable)
     .innerJoin(TicketTypesTable, eq(CheckinTypeTicketTypesTable.ticketTypeId, TicketTypesTable.id))
     .where(inArray(CheckinTypeTicketTypesTable.checkinTypeId, checkinTypeIds));
 
   for (const row of rows) {
-    const cur = map.get(row.checkinTypeId) ?? { ids: [], names: [] };
-    cur.ids.push(row.ticketTypeId);
-    cur.names.push(row.ticketTypeName);
+    const cur = map.get(row.checkinTypeId) ?? { ids: [], names: [], linkCount: 0 };
+    cur.linkCount += 1;
+    if (row.isActive) {
+      cur.ids.push(row.ticketTypeId);
+      cur.names.push(row.ticketTypeName);
+    }
     map.set(row.checkinTypeId, cur);
   }
 
   return map;
+}
+
+function ticketEligibilitySummary(linkCount: number, activeNames: string[]): string {
+  if (linkCount === 0) return 'All tickets';
+  if (activeNames.length === 0) return 'Restricted (no active ticket types)';
+  return activeNames.join(', ');
 }
 
 export const listCheckinTypes = createServerFn({ method: 'GET' }).handler(async () => {
@@ -59,13 +69,16 @@ export const listCheckinTypes = createServerFn({ method: 'GET' }).handler(async 
   const eligibility = await loadTicketEligibilityByCheckinType(checkinTypes.map((t) => t.id));
 
   const list: CheckinTypeListItem[] = checkinTypes.map((t) => {
-    const { ids, names } = eligibility.get(t.id) ?? { ids: [], names: [] };
-    const ticketEligibilitySummary = ids.length === 0 ? 'All tickets' : names.join(', ');
+    const { ids, names, linkCount } = eligibility.get(t.id) ?? {
+      ids: [],
+      names: [],
+      linkCount: 0,
+    };
     return {
       ...t,
       allowedTicketTypeIds: ids,
       allowedTicketTypeNames: names,
-      ticketEligibilitySummary,
+      ticketEligibilitySummary: ticketEligibilitySummary(linkCount, names),
     };
   });
 
@@ -98,37 +111,41 @@ export const createCheckinType = createServerFn({ method: 'POST' })
 
     const { allowedTicketTypeIds, ...checkinValues } = data;
 
-    const [newCheckinType] = await db.insert(CheckinTypesTable).values(checkinValues).returning();
+    const newCheckinType = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(CheckinTypesTable).values(checkinValues).returning();
 
-    if (allowedTicketTypeIds?.length) {
-      const validIds = await db
-        .select({ id: TicketTypesTable.id })
-        .from(TicketTypesTable)
-        .where(inArray(TicketTypesTable.id, allowedTicketTypeIds));
+      if (allowedTicketTypeIds?.length) {
+        const validIds = await tx
+          .select({ id: TicketTypesTable.id })
+          .from(TicketTypesTable)
+          .where(inArray(TicketTypesTable.id, allowedTicketTypeIds));
 
-      const idSet = new Set(validIds.map((r) => r.id));
-      const unknown = allowedTicketTypeIds.filter((tid) => !idSet.has(tid));
-      if (unknown.length > 0) {
-        throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
+        const idSet = new Set(validIds.map((r) => r.id));
+        const unknown = allowedTicketTypeIds.filter((tid) => !idSet.has(tid));
+        if (unknown.length > 0) {
+          throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
+        }
+
+        await tx.insert(CheckinTypeTicketTypesTable).values(
+          allowedTicketTypeIds.map((ticketTypeId) => ({
+            checkinTypeId: created.id,
+            ticketTypeId,
+          }))
+        );
       }
 
-      await db.insert(CheckinTypeTicketTypesTable).values(
-        allowedTicketTypeIds.map((ticketTypeId) => ({
-          checkinTypeId: newCheckinType.id,
-          ticketTypeId,
-        }))
-      );
-    }
+      return created;
+    });
 
     const eligibility = await loadTicketEligibilityByCheckinType([newCheckinType.id]);
-    const links = eligibility.get(newCheckinType.id) ?? { ids: [], names: [] };
+    const links = eligibility.get(newCheckinType.id) ?? { ids: [], names: [], linkCount: 0 };
 
     return {
       checkinType: {
         ...newCheckinType,
         allowedTicketTypeIds: links.ids,
         allowedTicketTypeNames: links.names,
-        ticketEligibilitySummary: links.ids.length === 0 ? 'All tickets' : links.names.join(', '),
+        ticketEligibilitySummary: ticketEligibilitySummary(links.linkCount, links.names),
       } satisfies CheckinTypeListItem,
     };
   });
@@ -170,54 +187,65 @@ export const updateCheckinType = createServerFn({ method: 'POST' })
       throw new Error('Check-in type not found');
     }
 
-    if (Object.keys(updateData).length > 0) {
-      const [row] = await db
-        .update(CheckinTypesTable)
-        .set(updateData)
-        .where(eq(CheckinTypesTable.id, id))
-        .returning();
-      if (row) {
-        updatedCheckinType = row;
-      }
+    if (Object.keys(updateData).length > 0 || allowedTicketTypeIds !== undefined) {
+      await db.transaction(async (tx) => {
+        if (Object.keys(updateData).length > 0) {
+          const [row] = await tx
+            .update(CheckinTypesTable)
+            .set(updateData)
+            .where(eq(CheckinTypesTable.id, id))
+            .returning();
+          if (row) {
+            updatedCheckinType = row;
+          }
+        }
+
+        if (allowedTicketTypeIds !== undefined) {
+          if (allowedTicketTypeIds.length > 0) {
+            const validIds = await tx
+              .select({ id: TicketTypesTable.id })
+              .from(TicketTypesTable)
+              .where(inArray(TicketTypesTable.id, allowedTicketTypeIds));
+
+            const idSet = new Set(validIds.map((r) => r.id));
+            const unknown = allowedTicketTypeIds.filter((tid) => !idSet.has(tid));
+            if (unknown.length > 0) {
+              throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
+            }
+          }
+
+          await tx
+            .delete(CheckinTypeTicketTypesTable)
+            .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, id));
+
+          if (allowedTicketTypeIds.length > 0) {
+            await tx.insert(CheckinTypeTicketTypesTable).values(
+              allowedTicketTypeIds.map((ticketTypeId) => ({
+                checkinTypeId: id,
+                ticketTypeId,
+              }))
+            );
+          }
+        }
+      });
     }
 
-    if (allowedTicketTypeIds !== undefined) {
-      if (allowedTicketTypeIds.length > 0) {
-        const validIds = await db
-          .select({ id: TicketTypesTable.id })
-          .from(TicketTypesTable)
-          .where(inArray(TicketTypesTable.id, allowedTicketTypeIds));
-
-        const idSet = new Set(validIds.map((r) => r.id));
-        const unknown = allowedTicketTypeIds.filter((tid) => !idSet.has(tid));
-        if (unknown.length > 0) {
-          throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
-        }
-      }
-
-      await db
-        .delete(CheckinTypeTicketTypesTable)
-        .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, id));
-
-      if (allowedTicketTypeIds.length > 0) {
-        await db.insert(CheckinTypeTicketTypesTable).values(
-          allowedTicketTypeIds.map((ticketTypeId) => ({
-            checkinTypeId: id,
-            ticketTypeId,
-          }))
-        );
-      }
+    const latest = await db.query.checkinTypes.findFirst({
+      where: eq(CheckinTypesTable.id, id),
+    });
+    if (latest) {
+      updatedCheckinType = latest;
     }
 
     const eligibility = await loadTicketEligibilityByCheckinType([id]);
-    const links = eligibility.get(id) ?? { ids: [], names: [] };
+    const links = eligibility.get(id) ?? { ids: [], names: [], linkCount: 0 };
 
     return {
       checkinType: {
         ...updatedCheckinType,
         allowedTicketTypeIds: links.ids,
         allowedTicketTypeNames: links.names,
-        ticketEligibilitySummary: links.ids.length === 0 ? 'All tickets' : links.names.join(', '),
+        ticketEligibilitySummary: ticketEligibilitySummary(links.linkCount, links.names),
       } satisfies CheckinTypeListItem,
     };
   });

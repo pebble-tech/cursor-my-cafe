@@ -123,12 +123,19 @@ export const processCheckin = createServerFn({ method: 'POST' })
     }
 
     const allowedLinks = await db
-      .select({ ticketTypeId: CheckinTypeTicketTypesTable.ticketTypeId })
+      .select({
+        ticketTypeId: CheckinTypeTicketTypesTable.ticketTypeId,
+        isActive: TicketTypesTable.isActive,
+      })
       .from(CheckinTypeTicketTypesTable)
+      .innerJoin(
+        TicketTypesTable,
+        eq(CheckinTypeTicketTypesTable.ticketTypeId, TicketTypesTable.id)
+      )
       .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, checkinTypeId));
 
     if (allowedLinks.length > 0) {
-      const allowedIds = new Set(allowedLinks.map((l) => l.ticketTypeId));
+      const allowedIds = new Set(allowedLinks.filter((l) => l.isActive).map((l) => l.ticketTypeId));
       const participantTicketId = participant.ticketTypeId;
       if (!participantTicketId || !allowedIds.has(participantTicketId)) {
         let participantTicketTypeName: string | null = null;
