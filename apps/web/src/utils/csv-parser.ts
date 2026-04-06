@@ -76,7 +76,9 @@ export function parseParticipantsCSV(csvContent: string): CSVParseResult {
   result.data.forEach((row, index) => {
     const email = (row['email'] || '').trim();
     const name = (row['name'] || '').trim();
-    const lumaId = (row['luma_id'] || row['lumaid'] || '').trim() || undefined;
+    const lumaId = [row['luma_id'], row['lumaid'], row['api_id'], row['apiid']]
+      .map((value) => value?.trim())
+      .find((value): value is string => Boolean(value));
     const userTypeRaw = (row['user_type'] || row['usertype'] || row['type'] || 'regular').trim().toLowerCase();
 
     const ticketTypeIdCol =

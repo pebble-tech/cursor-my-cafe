@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 
 import { UsersTable } from '@base/core/auth/schema';
 import { evaluateTicketEligibilityForCheckinType } from '@base/core/business.server/events/checkin-type-ticket-eligibility';
-import { verifyQRCodeValue } from '@base/core/business.server/events/events';
+import { resolveOpsCheckinScan } from '@base/core/business.server/ops/resolve-ops-checkin-scan';
 import {
   CheckinRecordsTable,
   CheckinTypeTicketTypesTable,
@@ -79,12 +79,10 @@ export const processCheckin = createServerFn({ method: 'POST' })
     const session = await requireOpsOrAdmin();
     const { qrValue, checkinTypeId } = data;
 
-    const qrVerification = verifyQRCodeValue(qrValue);
-    if (!qrVerification.valid) {
-      return { success: false, error: 'Invalid QR code' };
+    const resolved = await resolveOpsCheckinScan(db, qrValue);
+    if (!resolved.ok) {
+      return { success: false, error: resolved.error };
     }
-
-    const participantId = qrVerification.participantId;
 
     const participantRows = await db
       .select({
@@ -99,7 +97,7 @@ export const processCheckin = createServerFn({ method: 'POST' })
       })
       .from(UsersTable)
       .leftJoin(TicketTypesTable, eq(UsersTable.ticketTypeId, TicketTypesTable.id))
-      .where(eq(UsersTable.id, participantId))
+      .where(eq(UsersTable.id, resolved.participant.id))
       .limit(1);
 
     const participant = participantRows[0];
@@ -107,6 +105,8 @@ export const processCheckin = createServerFn({ method: 'POST' })
     if (!participant) {
       return { success: false, error: 'Participant not found' };
     }
+
+    const participantId = participant.id;
 
     const checkinType = await db.query.checkinTypes.findFirst({
       where: eq(CheckinTypesTable.id, checkinTypeId),
@@ -352,20 +352,13 @@ export const getGuestStatus = createServerFn({ method: 'POST' })
     await requireOpsOrAdmin();
     const { qrValue } = data;
 
-    const qrVerification = verifyQRCodeValue(qrValue);
-    if (!qrVerification.valid) {
-      return { success: false, error: 'Invalid QR code' };
+    const resolved = await resolveOpsCheckinScan(db, qrValue);
+    if (!resolved.ok) {
+      return { success: false, error: resolved.error };
     }
 
-    const participantId = qrVerification.participantId;
-
-    const participant = await db.query.users.findFirst({
-      where: eq(UsersTable.id, participantId),
-    });
-
-    if (!participant) {
-      return { success: false, error: 'Participant not found' };
-    }
+    const { participant } = resolved;
+    const participantId = participant.id;
 
     let ticketTypeName: string | null = null;
     if (participant.ticketTypeId) {

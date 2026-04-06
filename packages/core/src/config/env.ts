@@ -11,6 +11,8 @@ const EnvSchema = z.object({
   QR_SECRET_KEY: z.string().min(32),
   RESEND_API_KEY: z.string().min(1),
   EMAIL_FROM: z.string().default('Cursor MY <noreply@cursorhackathon.pebbletech.my>'),
+  LUMA_API_KEY: z.string().min(1).optional(),
+  LUMA_EVENT_ID: z.string().min(1).optional(),
 });
 
 export const env = EnvSchema.parse(process.env);

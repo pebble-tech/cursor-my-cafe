@@ -646,9 +646,9 @@ function ParticipantsPage() {
               <DialogHeader>
                 <DialogTitle>Import Participants</DialogTitle>
                 <DialogDescription>
-                  Columns: name, email, ticket_name (or ticket_type_id for Luma id), user_type (optional, defaults to
-                  regular), luma_id (optional). Regular participants require ticket metadata. Re-import updates name,
-                  Luma id, and ticket type for existing emails.
+                  Columns: name, email, ticket_name (or ticket_type_id / Luma ticket type id), user_type (optional,
+                  defaults to regular), luma_id or api_id (optional, for Luma QR check-in). Regular participants require
+                  ticket metadata. Re-import updates name, Luma id, and ticket type for existing participant emails.
                 </DialogDescription>
               </DialogHeader>
 
