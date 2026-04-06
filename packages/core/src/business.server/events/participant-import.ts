@@ -12,7 +12,6 @@ export type ImportParticipantRow = {
   lumaId?: string;
   userType: UserType;
   ticketLumaTypeId?: string;
-  ticketName?: string;
 };
 
 export type ExistingImportOwnedParticipant = {
@@ -28,21 +27,16 @@ export type ImportParticipantUpdate = {
   ticketTypeId: string | null;
 };
 
-export function buildTicketTypeLookupMaps(
-  ticketTypes: TicketTypeLookupRow[]
-): {
+export function buildTicketTypeLookupMaps(ticketTypes: TicketTypeLookupRow[]): {
   byLumaId: Map<string, string>;
-  byName: Map<string, string>;
 } {
   const byLumaId = new Map<string, string>();
-  const byName = new Map<string, string>();
 
   for (const ticketType of ticketTypes) {
     byLumaId.set(ticketType.lumaTicketTypeId, ticketType.id);
-    byName.set(ticketType.name, ticketType.id);
   }
 
-  return { byLumaId, byName };
+  return { byLumaId };
 }
 
 export function importEmailGroupMergeConflicts(
@@ -79,44 +73,26 @@ export function importEmailGroupMergeConflicts(
 }
 
 export function resolveTicketTypeIdForImport(
-  participant: Pick<ImportParticipantRow, 'userType' | 'ticketLumaTypeId' | 'ticketName'>,
-  byLumaId: Map<string, string>,
-  byName: Map<string, string>
+  participant: Pick<ImportParticipantRow, 'userType' | 'ticketLumaTypeId'>,
+  byLumaId: Map<string, string>
 ): { ticketTypeId: string | null; error?: string } {
   const lumaTicketTypeId = participant.ticketLumaTypeId?.trim();
-  const ticketName = participant.ticketName?.trim();
-
   const idFromLuma = lumaTicketTypeId ? byLumaId.get(lumaTicketTypeId) : undefined;
-  const idFromName = ticketName ? byName.get(ticketName) : undefined;
-
-  if (idFromLuma !== undefined && idFromName !== undefined && idFromLuma !== idFromName) {
-    return { ticketTypeId: null, error: 'Conflicting ticket_type_id and ticket_name for this row' };
-  }
 
   if (participant.userType !== UserTypeEnum.regular) {
     if (idFromLuma !== undefined) {
       return { ticketTypeId: idFromLuma };
     }
-    if (idFromName !== undefined) {
-      return { ticketTypeId: idFromName };
-    }
     return { ticketTypeId: null };
   }
 
-  if (lumaTicketTypeId && idFromLuma === undefined) {
+  if (!lumaTicketTypeId) {
+    return { ticketTypeId: null, error: 'Ticket type id required for regular participants' };
+  }
+  if (idFromLuma === undefined) {
     return { ticketTypeId: null, error: `Unknown ticket_type_id: ${lumaTicketTypeId}` };
   }
-  if (ticketName && idFromName === undefined) {
-    return { ticketTypeId: null, error: `Unknown ticket_name: ${ticketName}` };
-  }
-  if (idFromLuma !== undefined) {
-    return { ticketTypeId: idFromLuma };
-  }
-  if (idFromName !== undefined) {
-    return { ticketTypeId: idFromName };
-  }
-
-  return { ticketTypeId: null, error: 'Ticket metadata required for regular participants' };
+  return { ticketTypeId: idFromLuma };
 }
 
 export function buildImportParticipantUpdate(
