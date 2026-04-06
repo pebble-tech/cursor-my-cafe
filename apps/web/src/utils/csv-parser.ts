@@ -7,6 +7,10 @@ export type ParsedParticipant = {
   email: string;
   lumaId?: string;
   userType: UserType;
+  /** Luma ticket type id from CSV (e.g. evtticktyp-...) when column present */
+  ticketLumaTypeId?: string;
+  /** Display name from Luma export; used to match `ticket_types.name` */
+  ticketName?: string;
 };
 
 export type ParsedRow = {
@@ -75,9 +79,19 @@ export function parseParticipantsCSV(csvContent: string): CSVParseResult {
     const lumaId = (row['luma_id'] || row['lumaid'] || '').trim() || undefined;
     const userTypeRaw = (row['user_type'] || row['usertype'] || row['type'] || 'regular').trim().toLowerCase();
 
+    const ticketTypeIdCol =
+      (row['ticket_type_id'] || row['ticket_type id'] || '').trim() ||
+      (row['lumatickettypeid'] || '').trim();
+    const ticketLumaTypeId =
+      ticketTypeIdCol ||
+      (row['luma_ticket_type_id'] || row['luma ticket type id'] || '').trim() ||
+      undefined;
+    const ticketName =
+      (row['ticket_name'] || row['ticket name'] || row['ticket_type'] || '').trim() || undefined;
+
     const parsedRow: ParsedRow = {
       row: index + 1,
-      data: { name, email, lumaId, userType: 'regular' },
+      data: { name, email, lumaId, userType: 'regular', ticketLumaTypeId, ticketName },
       valid: true,
     };
 
@@ -95,6 +109,16 @@ export function parseParticipantsCSV(csvContent: string): CSVParseResult {
       parsedRow.error = `Invalid user_type: ${userTypeRaw}`;
     } else {
       parsedRow.data.userType = userTypeRaw as UserType;
+      const needsTicket = userTypeRaw === 'regular';
+      if (needsTicket) {
+        const hasTicketMeta = Boolean(
+          (ticketLumaTypeId && ticketLumaTypeId.length > 0) || (ticketName && ticketName.length > 0)
+        );
+        if (!hasTicketMeta) {
+          parsedRow.valid = false;
+          parsedRow.error = 'Ticket metadata required (ticket_type_id or ticket_name)';
+        }
+      }
     }
 
     if (parsedRow.valid) {

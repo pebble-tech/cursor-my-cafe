@@ -4,9 +4,11 @@ import { UsersTable } from '@base/core/auth/schema';
 import { verifyQRCodeValue } from '@base/core/business.server/events/events';
 import {
   CheckinRecordsTable,
+  CheckinTypeTicketTypesTable,
   CheckinTypesTable,
   CodesTable,
   CreditTypesTable,
+  TicketTypesTable,
 } from '@base/core/business.server/events/schemas/schema';
 import {
   CheckinTypeCategoryEnum,
@@ -50,6 +52,9 @@ export type ProcessCheckinResult =
   | {
       success: false;
       error: string;
+      ineligible?: boolean;
+      checkinTypeName?: string;
+      participantTicketTypeName?: string | null;
       participant?: {
         id: string;
         name: string;
@@ -115,6 +120,39 @@ export const processCheckin = createServerFn({ method: 'POST' })
         },
         existingCheckinTime: existingCheckin.checkedInAt,
       };
+    }
+
+    const allowedLinks = await db
+      .select({ ticketTypeId: CheckinTypeTicketTypesTable.ticketTypeId })
+      .from(CheckinTypeTicketTypesTable)
+      .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, checkinTypeId));
+
+    if (allowedLinks.length > 0) {
+      const allowedIds = new Set(allowedLinks.map((l) => l.ticketTypeId));
+      const participantTicketId = participant.ticketTypeId;
+      if (!participantTicketId || !allowedIds.has(participantTicketId)) {
+        let participantTicketTypeName: string | null = null;
+        if (participantTicketId) {
+          const tt = await db.query.ticketTypes.findFirst({
+            where: eq(TicketTypesTable.id, participantTicketId),
+          });
+          participantTicketTypeName = tt?.name ?? null;
+        }
+
+        return {
+          success: false,
+          error: `This ticket is not eligible for ${checkinType.name}`,
+          ineligible: true,
+          checkinTypeName: checkinType.name,
+          participantTicketTypeName,
+          participant: {
+            id: participant.id,
+            name: participant.name,
+            email: participant.email,
+            participantType: participant.participantType,
+          },
+        };
+      }
     }
 
     const isFirstAttendance =
@@ -273,6 +311,7 @@ export type GuestStatusResult =
         name: string;
         email: string;
         participantType: string;
+        ticketTypeName: string | null;
       };
       checkinStatuses: Array<{
         checkinTypeId: string;
@@ -311,6 +350,14 @@ export const getGuestStatus = createServerFn({ method: 'POST' })
       return { success: false, error: 'Participant not found' };
     }
 
+    let ticketTypeName: string | null = null;
+    if (participant.ticketTypeId) {
+      const tt = await db.query.ticketTypes.findFirst({
+        where: eq(TicketTypesTable.id, participant.ticketTypeId),
+      });
+      ticketTypeName = tt?.name ?? null;
+    }
+
     const checkinTypes = await db
       .select()
       .from(CheckinTypesTable)
@@ -336,6 +383,7 @@ export const getGuestStatus = createServerFn({ method: 'POST' })
         name: participant.name,
         email: participant.email,
         participantType: participant.participantType,
+        ticketTypeName,
       },
       checkinStatuses,
     };

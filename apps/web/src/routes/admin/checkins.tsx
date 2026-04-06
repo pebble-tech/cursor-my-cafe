@@ -28,9 +28,11 @@ import {
   listCheckinTypes,
   toggleCheckinTypeActive,
   updateCheckinType,
+  type CheckinTypeListItem,
   type CreateCheckinTypeInput,
   type UpdateCheckinTypeInput,
 } from '~/apis/admin/checkins';
+import { listTicketTypes } from '~/apis/admin/ticket-types';
 
 export const Route = createFileRoute('/admin/checkins')({
   head: () => ({
@@ -39,15 +41,7 @@ export const Route = createFileRoute('/admin/checkins')({
   component: CheckinTypesPage,
 });
 
-type CheckinType = {
-  id: string;
-  name: string;
-  type: 'attendance' | 'meal';
-  description: string | null;
-  displayOrder: number;
-  isActive: boolean;
-  createdAt: Date;
-};
+type CheckinType = CheckinTypeListItem;
 
 function CheckinTypesPage() {
   const queryClient = useQueryClient();
@@ -63,11 +57,17 @@ function CheckinTypesPage() {
     description: '',
     displayOrder: 0,
     isActive: true,
+    allowedTicketTypeIds: [] as string[],
   });
 
   const { data, isLoading } = useQuery({
     queryKey: ['checkin-types'],
     queryFn: () => listCheckinTypes(),
+  });
+
+  const { data: ticketTypesData } = useQuery({
+    queryKey: ['ticket-types'],
+    queryFn: () => listTicketTypes(),
   });
 
   const createMutation = useMutation({
@@ -112,6 +112,7 @@ function CheckinTypesPage() {
       description: '',
       displayOrder: 0,
       isActive: true,
+      allowedTicketTypeIds: [],
     });
   };
 
@@ -122,6 +123,8 @@ function CheckinTypesPage() {
       description: formData.description || undefined,
       displayOrder: formData.displayOrder,
       isActive: formData.isActive,
+      allowedTicketTypeIds:
+        formData.allowedTicketTypeIds.length > 0 ? formData.allowedTicketTypeIds : undefined,
     });
   };
 
@@ -134,6 +137,7 @@ function CheckinTypesPage() {
       description: formData.description || undefined,
       displayOrder: formData.displayOrder,
       isActive: formData.isActive,
+      allowedTicketTypeIds: formData.allowedTicketTypeIds,
     });
   };
 
@@ -145,6 +149,7 @@ function CheckinTypesPage() {
       description: checkinType.description || '',
       displayOrder: checkinType.displayOrder,
       isActive: checkinType.isActive,
+      allowedTicketTypeIds: [...checkinType.allowedTicketTypeIds],
     });
     setEditDialogOpen(true);
   };
@@ -182,6 +187,13 @@ function CheckinTypesPage() {
           </span>
         );
       },
+    },
+    {
+      accessorKey: 'ticketEligibilitySummary',
+      header: 'Ticket eligibility',
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600">{row.original.ticketEligibilitySummary}</span>
+      ),
     },
     {
       accessorKey: 'description',
@@ -277,6 +289,7 @@ function CheckinTypesPage() {
             <CheckinTypeForm
               formData={formData}
               setFormData={setFormData}
+              ticketTypes={ticketTypesData?.ticketTypes ?? []}
               error={createMutation.error as Error | null}
             />
 
@@ -327,7 +340,12 @@ function CheckinTypesPage() {
             <DialogDescription>Update the check-in type details.</DialogDescription>
           </DialogHeader>
 
-          <CheckinTypeForm formData={formData} setFormData={setFormData} error={updateMutation.error as Error | null} />
+          <CheckinTypeForm
+            formData={formData}
+            setFormData={setFormData}
+            ticketTypes={ticketTypesData?.ticketTypes ?? []}
+            error={updateMutation.error as Error | null}
+          />
 
           <DialogFooter>
             <DialogClose asChild>
@@ -404,6 +422,7 @@ type CheckinTypeFormProps = {
     description: string;
     displayOrder: number;
     isActive: boolean;
+    allowedTicketTypeIds: string[];
   };
   setFormData: React.Dispatch<
     React.SetStateAction<{
@@ -412,12 +431,14 @@ type CheckinTypeFormProps = {
       description: string;
       displayOrder: number;
       isActive: boolean;
+      allowedTicketTypeIds: string[];
     }>
   >;
+  ticketTypes: Array<{ id: string; name: string; code: string }>;
   error: Error | null;
 };
 
-function CheckinTypeForm({ formData, setFormData, error }: CheckinTypeFormProps) {
+function CheckinTypeForm({ formData, setFormData, ticketTypes, error }: CheckinTypeFormProps) {
   return (
     <div className="space-y-4 py-4">
       <div className="space-y-2">
@@ -481,6 +502,37 @@ function CheckinTypeForm({ formData, setFormData, error }: CheckinTypeFormProps)
             Active
           </label>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Allowed ticket types</label>
+        <p className="text-xs text-gray-500">Leave none selected for all tickets. Otherwise only linked ticket types may use this check-in.</p>
+        {ticketTypes.length === 0 ? (
+          <p className="text-sm text-amber-700">Create ticket types first to restrict eligibility.</p>
+        ) : (
+          <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">
+            {ticketTypes.map((tt) => (
+              <label key={tt.id} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300"
+                  checked={formData.allowedTicketTypeIds.includes(tt.id)}
+                  onChange={(e) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      allowedTicketTypeIds: e.target.checked
+                        ? [...prev.allowedTicketTypeIds, tt.id]
+                        : prev.allowedTicketTypeIds.filter((id) => id !== tt.id),
+                    }));
+                  }}
+                />
+                <span>
+                  {tt.name} <span className="text-gray-400">({tt.code})</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (

@@ -4,7 +4,11 @@ import { z } from 'zod';
 
 import { UsersTable } from '@base/core/auth/schema';
 import { generateQRCodeValue } from '@base/core/business.server/events/events';
-import { CheckinRecordsTable, CheckinTypesTable } from '@base/core/business.server/events/schemas/schema';
+import {
+  CheckinRecordsTable,
+  CheckinTypesTable,
+  TicketTypesTable,
+} from '@base/core/business.server/events/schemas/schema';
 import {
   ParticipantStatusCodes,
   ParticipantStatusEnum,
@@ -16,10 +20,57 @@ import {
   UserTypeEnum,
   type ParticipantType,
   type UserRole,
+  type UserType,
 } from '@base/core/config/constant';
 import { and, asc, count, db, desc, eq, ilike, inArray, or, type SQL } from '@base/core/drizzle.server';
 
 import { requireAdmin } from '~/apis/auth';
+
+function buildTicketTypeLookupMaps(
+  ticketTypes: Array<{ id: string; name: string; lumaTicketTypeId: string }>
+): {
+  byLumaId: Map<string, string>;
+  byName: Map<string, string>;
+} {
+  const byLumaId = new Map<string, string>();
+  const byName = new Map<string, string>();
+  for (const t of ticketTypes) {
+    byLumaId.set(t.lumaTicketTypeId, t.id);
+    byName.set(t.name, t.id);
+  }
+  return { byLumaId, byName };
+}
+
+function resolveTicketTypeIdForImport(
+  p: {
+    userType: UserType;
+    ticketLumaTypeId?: string;
+    ticketName?: string;
+  },
+  byLumaId: Map<string, string>,
+  byName: Map<string, string>
+): { ticketTypeId: string | null; error?: string } {
+  const luma = p.ticketLumaTypeId?.trim();
+  const name = p.ticketName?.trim();
+  if (luma) {
+    const id = byLumaId.get(luma);
+    if (!id) {
+      return { ticketTypeId: null, error: `Unknown ticket_type_id: ${luma}` };
+    }
+    return { ticketTypeId: id };
+  }
+  if (name) {
+    const id = byName.get(name);
+    if (!id) {
+      return { ticketTypeId: null, error: `Unknown ticket_name: ${name}` };
+    }
+    return { ticketTypeId: id };
+  }
+  if (p.userType === UserTypeEnum.regular) {
+    return { ticketTypeId: null, error: 'Ticket metadata required for regular participants' };
+  }
+  return { ticketTypeId: null };
+}
 
 const listParticipantsInputSchema = z.object({
   page: z.number().min(1).default(1),
@@ -83,8 +134,11 @@ export const listParticipants = createServerFn({ method: 'GET' })
           status: UsersTable.status,
           createdAt: UsersTable.createdAt,
           checkedInAt: UsersTable.checkedInAt,
+          ticketTypeId: UsersTable.ticketTypeId,
+          ticketTypeName: TicketTypesTable.name,
         })
         .from(UsersTable)
+        .leftJoin(TicketTypesTable, eq(UsersTable.ticketTypeId, TicketTypesTable.id))
         .where(whereClause)
         .orderBy(orderFn(sortColumn))
         .limit(pageSize)
@@ -170,6 +224,8 @@ const importParticipantsInputSchema = z.object({
       email: z.string().email(),
       lumaId: z.string().optional(),
       userType: z.enum(UserTypeCodes).default('regular'),
+      ticketLumaTypeId: z.string().optional(),
+      ticketName: z.string().optional(),
     })
   ),
 });
@@ -190,37 +246,134 @@ export const importParticipants = createServerFn({ method: 'POST' })
     const { participants } = data;
 
     if (participants.length === 0) {
-      return { imported: 0, skipped: [] as SkippedRow[] };
+      return { inserted: 0, updated: 0, skipped: [] as SkippedRow[] };
     }
 
-    const emails = participants.map((p) => p.email.toLowerCase().trim());
+    const ticketTypeRows = await db
+      .select({
+        id: TicketTypesTable.id,
+        name: TicketTypesTable.name,
+        lumaTicketTypeId: TicketTypesTable.lumaTicketTypeId,
+      })
+      .from(TicketTypesTable);
+
+    const { byLumaId, byName } = buildTicketTypeLookupMaps(ticketTypeRows);
+
+    type CanonicalRow = (typeof participants)[number] & {
+      ticketTypeId: string | null;
+    };
+
+    const emailToCanonical = new Map<string, CanonicalRow>();
+    const skipped: SkippedRow[] = [];
+
+    const groupedByEmail = new Map<string, Array<{ rowNumber: number; p: (typeof participants)[number] }>>();
+    participants.forEach((p, index) => {
+      const normalizedEmail = p.email.toLowerCase().trim();
+      const arr = groupedByEmail.get(normalizedEmail) ?? [];
+      arr.push({ rowNumber: index + 1, p });
+      groupedByEmail.set(normalizedEmail, arr);
+    });
+
+    for (const [normalizedEmail, group] of groupedByEmail.entries()) {
+      const userTypes = new Set(group.map((g) => g.p.userType));
+      if (userTypes.size > 1) {
+        for (const g of group) {
+          skipped.push({
+            row: g.rowNumber,
+            email: normalizedEmail,
+            reason: 'Conflicting user_type for same email in import file',
+          });
+        }
+        continue;
+      }
+
+      const resolutions = group.map((g) => ({
+        ...g,
+        ...resolveTicketTypeIdForImport(g.p, byLumaId, byName),
+      }));
+
+      if (resolutions.some((r) => r.error)) {
+        for (const r of resolutions) {
+          skipped.push({
+            row: r.rowNumber,
+            email: normalizedEmail,
+            reason: r.error ?? 'Invalid ticket data for this email in import file',
+          });
+        }
+        continue;
+      }
+
+      const ticketKeySet = new Set(
+        resolutions.map((r) => (r.ticketTypeId === null ? '__null__' : r.ticketTypeId))
+      );
+      if (ticketKeySet.size > 1) {
+        for (const r of resolutions) {
+          skipped.push({
+            row: r.rowNumber,
+            email: normalizedEmail,
+            reason: 'Conflicting ticket data for same email in import file',
+          });
+        }
+        continue;
+      }
+
+      const first = resolutions[0];
+      const ticketTypeId = first.ticketTypeId;
+
+      emailToCanonical.set(normalizedEmail, {
+        ...first.p,
+        ticketTypeId,
+      });
+    }
+
+    const canonicalList = [...emailToCanonical.values()];
+    const emails = canonicalList.map((c) => c.email.toLowerCase().trim());
+
     const existingUsers = await db
-      .select({ email: UsersTable.email })
+      .select({
+        id: UsersTable.id,
+        email: UsersTable.email,
+        name: UsersTable.name,
+        lumaId: UsersTable.lumaId,
+        ticketTypeId: UsersTable.ticketTypeId,
+      })
       .from(UsersTable)
       .where(inArray(UsersTable.email, emails));
 
-    const existingEmails = new Set(existingUsers.map((u) => u.email));
+    const existingByEmail = new Map(existingUsers.map((u) => [u.email, u]));
 
     const toInsert: (typeof UsersTable.$inferInsert)[] = [];
-    const skipped: SkippedRow[] = [];
+    const toUpdate: Array<{
+      id: string;
+      name: string;
+      lumaId: string | null;
+      ticketTypeId: string | null;
+    }> = [];
 
-    participants.forEach((p, index) => {
-      const normalizedEmail = p.email.toLowerCase().trim();
+    canonicalList.forEach((c) => {
+      const normalizedEmail = c.email.toLowerCase().trim();
+      const existing = existingByEmail.get(normalizedEmail);
 
-      if (existingEmails.has(normalizedEmail)) {
-        skipped.push({
-          row: index + 1,
-          email: normalizedEmail,
-          reason: 'Email already registered',
-        });
-        return;
+      let role: UserRole = UserRoleEnum.participant;
+      let participantType: ParticipantType = ParticipantTypeEnum.regular;
+
+      if (c.userType === UserTypeEnum.vip) {
+        participantType = ParticipantTypeEnum.vip;
+      } else if (c.userType === UserTypeEnum.ops) {
+        role = UserRoleEnum.ops;
+      } else if (c.userType === UserTypeEnum.admin) {
+        role = UserRoleEnum.admin;
+      } else if (c.userType === UserTypeEnum.regular) {
+        role = UserRoleEnum.participant;
+        participantType = ParticipantTypeEnum.regular;
       }
 
-      if (toInsert.some((u) => u.email === normalizedEmail)) {
-        skipped.push({
-          row: index + 1,
-          email: normalizedEmail,
-          reason: 'Duplicate email in import file',
+      if (existing) {
+        toUpdate.push({
+          id: existing.id,
+          name: c.name,
+          lumaId: c.lumaId || null,
+          ticketTypeId: c.ticketTypeId,
         });
         return;
       }
@@ -228,43 +381,47 @@ export const importParticipants = createServerFn({ method: 'POST' })
       const userId = cuid();
       const qrCodeValue = generateQRCodeValue(userId);
 
-      let role: UserRole = UserRoleEnum.participant;
-      let participantType: ParticipantType = ParticipantTypeEnum.regular;
-
-      if (p.userType === UserTypeEnum.vip) {
-        participantType = ParticipantTypeEnum.vip;
-      } else if (p.userType === UserTypeEnum.ops) {
-        role = UserRoleEnum.ops;
-      } else if (p.userType === UserTypeEnum.admin) {
-        role = UserRoleEnum.admin;
-      } else if (p.userType === UserTypeEnum.regular) {
-        role = UserRoleEnum.participant;
-        participantType = ParticipantTypeEnum.regular;
-      }
-
       toInsert.push({
         id: userId,
-        name: p.name,
+        name: c.name,
         email: normalizedEmail,
         emailVerified: false,
         role,
         participantType,
         status: ParticipantStatusEnum.registered,
-        lumaId: p.lumaId || null,
+        lumaId: c.lumaId || null,
         qrCodeValue,
+        ticketTypeId: c.ticketTypeId,
       });
     });
+
+    let inserted = 0;
+    let updated = 0;
 
     if (toInsert.length > 0) {
       const batchSize = 100;
       for (let i = 0; i < toInsert.length; i += batchSize) {
         const batch = toInsert.slice(i, i + batchSize);
         await db.insert(UsersTable).values(batch);
+        inserted += batch.length;
       }
     }
 
+    for (const u of toUpdate) {
+      await db
+        .update(UsersTable)
+        .set({
+          name: u.name,
+          lumaId: u.lumaId,
+          ticketTypeId: u.ticketTypeId,
+        })
+        .where(eq(UsersTable.id, u.id));
+      updated += 1;
+    }
+
     return {
-      imported: toInsert.length,
+      inserted,
+      updated,
       skipped,
     };
   });
@@ -276,6 +433,7 @@ const updateUserInputSchema = z.object({
   role: z.enum(UserRoleCodes).optional(),
   participantType: z.enum(ParticipantTypeCodes).optional(),
   status: z.enum(ParticipantStatusCodes).optional(),
+  ticketTypeId: z.string().nullable().optional(),
 });
 
 export type UpdateUserInput = z.infer<typeof updateUserInputSchema>;
@@ -285,7 +443,7 @@ export const updateUser = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAdmin();
 
-    const { id, name, email, role, participantType, status } = data;
+    const { id, name, email, role, participantType, status, ticketTypeId } = data;
 
     const existing = await db.query.users.findFirst({
       where: eq(UsersTable.id, id),
@@ -324,6 +482,20 @@ export const updateUser = createServerFn({ method: 'POST' })
 
     if (status !== undefined) {
       updateData.status = status;
+    }
+
+    if (ticketTypeId !== undefined) {
+      if (ticketTypeId === null) {
+        updateData.ticketTypeId = null;
+      } else {
+        const tt = await db.query.ticketTypes.findFirst({
+          where: eq(TicketTypesTable.id, ticketTypeId),
+        });
+        if (!tt) {
+          throw new Error('Ticket type not found');
+        }
+        updateData.ticketTypeId = ticketTypeId;
+      }
     }
 
     if (Object.keys(updateData).length === 0) {
