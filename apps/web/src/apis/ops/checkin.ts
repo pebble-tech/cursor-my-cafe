@@ -32,6 +32,7 @@ export type ProcessCheckinResult =
         email: string;
         participantType: string;
         qrCodeValue: string | null;
+        ticketTypeName: string | null;
       };
       codesAssigned: number;
       assignedCodes: Array<{
@@ -127,6 +128,7 @@ export const processCheckin = createServerFn({ method: 'POST' })
       return {
         success: false,
         error: 'Already checked in',
+        participantTicketTypeName: participant.ticketTypeName ?? null,
         participant: {
           id: participant.id,
           name: participant.name,
@@ -312,6 +314,7 @@ export const processCheckin = createServerFn({ method: 'POST' })
         email: participant.email,
         participantType: participant.participantType,
         qrCodeValue: participant.qrCodeValue,
+        ticketTypeName: participant.ticketTypeName ?? null,
       },
       codesAssigned,
       assignedCodes: assignedCodesData,

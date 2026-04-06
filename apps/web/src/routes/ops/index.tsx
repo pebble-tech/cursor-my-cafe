@@ -128,9 +128,9 @@ function ScanResultPopup({
               </p>
             )}
             <p className="mt-2 text-sm">{checkinTypeName}</p>
-            {type === 'ineligible' && participantTicketTypeName !== undefined && participantTicketTypeName !== null && (
-              <p className="mt-1 text-xs opacity-80">Guest ticket: {participantTicketTypeName}</p>
-            )}
+            {participantTicketTypeName ? (
+              <p className="mt-1 text-sm opacity-90">Ticket: {participantTicketTypeName}</p>
+            ) : null}
             {detailMessage && type === 'ineligible' && (
               <p className="mt-2 text-center text-sm font-medium">{detailMessage}</p>
             )}
@@ -279,6 +279,7 @@ function OpsDashboardPage() {
             type: 'success',
             participantName: result.participant.name,
             checkinTypeName: checkinTypesData?.checkinTypes.find((t) => t.id === selectedCheckinTypeId)?.name || '',
+            participantTicketTypeName: result.participant.ticketTypeName,
             codesAssigned: result.codesAssigned,
             isVip: result.isVip,
             onClose: handleCloseSuccess,
@@ -301,6 +302,7 @@ function OpsDashboardPage() {
               type: duplicate ? 'duplicate' : 'error',
               participantName: result.participant?.name || 'Unknown',
               checkinTypeName,
+              participantTicketTypeName: result.participantTicketTypeName,
               existingCheckinTime: result.existingCheckinTime,
               detailMessage: duplicate ? 'Already checked in for this station.' : result.error,
               onClose: handleCloseError,
