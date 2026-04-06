@@ -335,7 +335,7 @@ function TicketTypeFormFields({
         <Input
           className="font-mono text-sm"
           value={form.lumaTicketTypeId}
-          onChange={(e) => setForm((f) => ({ ...f, lumaTicketTypeId: e.target.value.trim() }))}
+          onChange={(e) => setForm((f) => ({ ...f, lumaTicketTypeId: e.target.value }))}
         />
       </div>
       <div className="flex items-center gap-2">

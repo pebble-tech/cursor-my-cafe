@@ -29,21 +29,32 @@ export const createTicketType = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAdmin();
 
+    const payload = {
+      ...data,
+      code: data.code.trim(),
+      name: data.name.trim(),
+      lumaTicketTypeId: data.lumaTicketTypeId.trim(),
+    };
+
+    if (!payload.code || !payload.name || !payload.lumaTicketTypeId) {
+      throw new Error('Code, name, and Luma ticket type ID cannot be blank');
+    }
+
     const existingCode = await db.query.ticketTypes.findFirst({
-      where: eq(TicketTypesTable.code, data.code),
+      where: eq(TicketTypesTable.code, payload.code),
     });
     if (existingCode) {
       throw new Error('A ticket type with this code already exists');
     }
 
     const existingLuma = await db.query.ticketTypes.findFirst({
-      where: eq(TicketTypesTable.lumaTicketTypeId, data.lumaTicketTypeId),
+      where: eq(TicketTypesTable.lumaTicketTypeId, payload.lumaTicketTypeId),
     });
     if (existingLuma) {
       throw new Error('A ticket type with this Luma ticket type ID already exists');
     }
 
-    const [created] = await db.insert(TicketTypesTable).values(data).returning();
+    const [created] = await db.insert(TicketTypesTable).values(payload).returning();
     return { ticketType: created };
   });
 
@@ -62,13 +73,33 @@ export const updateTicketType = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAdmin();
 
-    const { id, ...patch } = data;
+    const { id, ...rawPatch } = data;
 
     const current = await db.query.ticketTypes.findFirst({
       where: eq(TicketTypesTable.id, id),
     });
     if (!current) {
       throw new Error('Ticket type not found');
+    }
+
+    const patch: typeof rawPatch = { ...rawPatch };
+    if (patch.code !== undefined) {
+      patch.code = patch.code.trim();
+      if (!patch.code) {
+        throw new Error('Code cannot be blank');
+      }
+    }
+    if (patch.name !== undefined) {
+      patch.name = patch.name.trim();
+      if (!patch.name) {
+        throw new Error('Name cannot be blank');
+      }
+    }
+    if (patch.lumaTicketTypeId !== undefined) {
+      patch.lumaTicketTypeId = patch.lumaTicketTypeId.trim();
+      if (!patch.lumaTicketTypeId) {
+        throw new Error('Luma ticket type ID cannot be blank');
+      }
     }
 
     if (patch.code !== undefined) {

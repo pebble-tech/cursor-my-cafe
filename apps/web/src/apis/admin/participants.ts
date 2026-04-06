@@ -255,12 +255,14 @@ export const importParticipants = createServerFn({ method: 'POST' })
         name: TicketTypesTable.name,
         lumaTicketTypeId: TicketTypesTable.lumaTicketTypeId,
       })
-      .from(TicketTypesTable);
+      .from(TicketTypesTable)
+      .where(eq(TicketTypesTable.isActive, true));
 
     const { byLumaId, byName } = buildTicketTypeLookupMaps(ticketTypeRows);
 
     type CanonicalRow = (typeof participants)[number] & {
       ticketTypeId: string | null;
+      rowNumbers: number[];
     };
 
     const emailToCanonical = new Map<string, CanonicalRow>();
@@ -323,16 +325,23 @@ export const importParticipants = createServerFn({ method: 'POST' })
       emailToCanonical.set(normalizedEmail, {
         ...first.p,
         ticketTypeId,
+        rowNumbers: resolutions.map((r) => r.rowNumber),
       });
     }
 
     const canonicalList = [...emailToCanonical.values()];
+
+    if (canonicalList.length === 0) {
+      return { inserted: 0, updated: 0, skipped };
+    }
+
     const emails = canonicalList.map((c) => c.email.toLowerCase().trim());
 
     const existingUsers = await db
       .select({
         id: UsersTable.id,
         email: UsersTable.email,
+        role: UsersTable.role,
         name: UsersTable.name,
         lumaId: UsersTable.lumaId,
         ticketTypeId: UsersTable.ticketTypeId,
@@ -369,6 +378,16 @@ export const importParticipants = createServerFn({ method: 'POST' })
       }
 
       if (existing) {
+        if (existing.role !== UserRoleEnum.participant) {
+          for (const rowNum of c.rowNumbers) {
+            skipped.push({
+              row: rowNum,
+              email: normalizedEmail,
+              reason: 'Email already belongs to a non-participant account',
+            });
+          }
+          return;
+        }
         toUpdate.push({
           id: existing.id,
           name: c.name,
