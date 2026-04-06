@@ -152,17 +152,20 @@ export const updateTicketType = createServerFn({ method: 'POST' })
       return { ticketType: current };
     }
 
+    let updated: (typeof TicketTypesTable.$inferSelect) | undefined;
     try {
-      const [updated] = await db
+      [updated] = await db
         .update(TicketTypesTable)
         .set(patch)
         .where(eq(TicketTypesTable.id, id))
         .returning();
-
-      return { ticketType: updated };
     } catch (e) {
       rethrowTicketTypeUniqueViolation(e);
     }
+    if (!updated) {
+      throw new Error('Ticket type not found');
+    }
+    return { ticketType: updated };
   });
 
 const deleteTicketTypeInputSchema = z.object({

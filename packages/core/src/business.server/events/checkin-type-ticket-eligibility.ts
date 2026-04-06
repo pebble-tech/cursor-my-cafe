@@ -9,7 +9,6 @@ import {
 
 export type DbClient = NodePgDatabase<typeof schema>;
 
-/** All persisted join rows plus active-only names used for enforcement and copy. */
 export type CheckinTypeTicketEligibility = {
   linkedTicketTypeIds: string[];
   activeTicketTypeNames: string[];
@@ -22,7 +21,6 @@ const emptyEligibility = (): CheckinTypeTicketEligibility => ({
   linkCount: 0,
 });
 
-/** Human-readable rule for ops/admin (matches scan-time “active ticket types only”). */
 export function formatTicketEligibilitySummary(linkCount: number, activeTicketTypeNames: string[]): string {
   if (linkCount === 0) return 'All tickets';
   if (activeTicketTypeNames.length === 0) return 'Restricted (no active ticket types)';

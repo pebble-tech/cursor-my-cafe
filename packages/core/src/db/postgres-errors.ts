@@ -7,7 +7,6 @@ export function isPostgresUniqueViolation(error: unknown): boolean {
   );
 }
 
-/** Maps Postgres 23505 detail to the same messages as application-level duplicate checks. */
 export function rethrowTicketTypeUniqueViolation(error: unknown): never {
   if (!isPostgresUniqueViolation(error)) throw error;
   const detail =

@@ -30,15 +30,14 @@ export const listCheckinTypes = createServerFn({ method: 'GET' }).handler(async 
     .where(eq(CheckinTypesTable.isActive, true))
     .orderBy(asc(CheckinTypesTable.displayOrder));
 
-  const ids = checkinTypes.map((t) => t.id);
-  const eligibility = await loadCheckinTypeTicketEligibility(db, ids);
-  const summaryByCheckinType = new Map(
-    ids.map((id) => [id, summaryForLoadedEligibility(eligibility.get(id))] as const)
+  const eligibility = await loadCheckinTypeTicketEligibility(
+    db,
+    checkinTypes.map((t) => t.id)
   );
 
   const list: OpsCheckinTypeItem[] = checkinTypes.map((t) => ({
     ...t,
-    ticketEligibilitySummary: summaryByCheckinType.get(t.id) ?? 'All tickets',
+    ticketEligibilitySummary: summaryForLoadedEligibility(eligibility.get(t.id)),
   }));
 
   return { checkinTypes: list };
