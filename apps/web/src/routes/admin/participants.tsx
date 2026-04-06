@@ -67,6 +67,7 @@ import {
   type ListParticipantsInput,
   type UpdateUserInput,
 } from '~/apis/admin/participants';
+import { listTicketTypes } from '~/apis/admin/ticket-types';
 import { generateSkippedRowsCSV, parseParticipantsCSV, type ParsedRow } from '~/utils/csv-parser';
 
 export const Route = createFileRoute('/admin/participants')({
@@ -85,6 +86,8 @@ type Participant = {
   status: string;
   createdAt: Date;
   checkedInAt: Date | null;
+  ticketTypeId: string | null;
+  ticketTypeName: string | null;
 };
 
 const columns: ColumnDef<Participant>[] = [
@@ -111,6 +114,14 @@ const columns: ColumnDef<Participant>[] = [
           {role}
         </span>
       );
+    },
+  },
+  {
+    accessorKey: 'ticketTypeName',
+    header: 'Ticket',
+    cell: ({ row }) => {
+      const name = row.getValue('ticketTypeName') as string | null;
+      return <span className="text-sm text-gray-600">{name ?? '—'}</span>;
     },
   },
   {
@@ -249,10 +260,12 @@ function ParticipantsPage() {
   const [originalParticipantType, setOriginalParticipantType] = useState<string | null>(null);
 
   const [importResult, setImportResult] = useState<{
-    imported: number;
+    inserted: number;
     updated: number;
     skipped: Array<{ row: number; email: string; reason: string }>;
   } | null>(null);
+
+  const [editTicketTypeId, setEditTicketTypeId] = useState<string | null>(null);
 
   const listParams: ListParticipantsInput = {
     page: pagination.pageIndex + 1,
@@ -268,6 +281,11 @@ function ParticipantsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['participants', listParams],
     queryFn: () => listParticipants({ data: listParams }),
+  });
+
+  const { data: ticketTypesData } = useQuery({
+    queryKey: ['ticket-types'],
+    queryFn: () => listTicketTypes(),
   });
 
   const { data: emailStats, refetch: refetchEmailStats } = useQuery({
@@ -320,8 +338,16 @@ function ParticipantsPage() {
   });
 
   const importMutation = useMutation({
-    mutationFn: (participants: Array<{ name: string; email: string; lumaId?: string; userType: UserType }>) =>
-      importParticipants({ data: { participants } }),
+    mutationFn: (
+      participants: Array<{
+        name: string;
+        email: string;
+        lumaId?: string;
+        userType: UserType;
+        ticketLumaTypeId?: string;
+        ticketName?: string;
+      }>
+    ) => importParticipants({ data: { participants } }),
     onSuccess: (result) => {
       setImportResult(result);
       queryClient.invalidateQueries({ queryKey: ['participants'] });
@@ -416,6 +442,7 @@ function ParticipantsPage() {
     setNewUserType(userType);
     setOriginalRole(participant.role);
     setOriginalParticipantType(participant.participantType);
+    setEditTicketTypeId(participant.ticketTypeId);
     setEditUserDialogOpen(true);
   };
 
@@ -475,6 +502,10 @@ function ParticipantsPage() {
     }
     if (newParticipantType !== originalParticipantType) {
       updateData.participantType = newParticipantType;
+    }
+
+    if (editTicketTypeId !== editingUser.ticketTypeId) {
+      updateData.ticketTypeId = editTicketTypeId;
     }
 
     updateUserMutation.mutate(updateData);
@@ -615,8 +646,9 @@ function ParticipantsPage() {
               <DialogHeader>
                 <DialogTitle>Import Participants</DialogTitle>
                 <DialogDescription>
-                  Upload a CSV file with columns: name, email, user_type (optional: regular/vip/ops/admin, defaults to
-                  regular), luma_id or api_id (optional, for Luma QR check-in)
+                  Columns: name, email, ticket_name (or ticket_type_id / Luma ticket type id), user_type (optional,
+                  defaults to regular), luma_id or api_id (optional, for Luma QR check-in). Regular participants require
+                  ticket metadata. Re-import updates name, Luma id, and ticket type for existing participant emails.
                 </DialogDescription>
               </DialogHeader>
 
@@ -626,7 +658,7 @@ function ParticipantsPage() {
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                     <div>
                       <p className="font-medium text-green-800">
-                        Imported {importResult.imported} new, updated {importResult.updated} existing
+                        Import complete: {importResult.inserted} inserted, {importResult.updated} updated
                       </p>
                       {importResult.skipped.length > 0 && (
                         <p className="text-sm text-green-700">{importResult.skipped.length} rows skipped</p>
@@ -674,6 +706,7 @@ function ParticipantsPage() {
                               <th className="px-3 py-2 text-left font-medium text-gray-600">Row</th>
                               <th className="px-3 py-2 text-left font-medium text-gray-600">Name</th>
                               <th className="px-3 py-2 text-left font-medium text-gray-600">Email</th>
+                              <th className="px-3 py-2 text-left font-medium text-gray-600">Ticket</th>
                               <th className="px-3 py-2 text-left font-medium text-gray-600">User Type</th>
                               <th className="px-3 py-2 text-left font-medium text-gray-600">Status</th>
                             </tr>
@@ -684,6 +717,9 @@ function ParticipantsPage() {
                                 <td className="px-3 py-2 text-gray-500">{row.row}</td>
                                 <td className="px-3 py-2">{row.data.name}</td>
                                 <td className="px-3 py-2">{row.data.email}</td>
+                                <td className="px-3 py-2 text-xs text-gray-600">
+                                  {row.data.ticketLumaTypeId || row.data.ticketName || '—'}
+                                </td>
                                 <td className="px-3 py-2">
                                   <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
                                     {row.data.userType}
@@ -900,6 +936,7 @@ function ParticipantsPage() {
             setNewUserType(UserTypeEnum.vip);
             setOriginalRole(null);
             setOriginalParticipantType(null);
+            setEditTicketTypeId(null);
           }
         }}
       >
@@ -936,6 +973,26 @@ function ParticipantsPage() {
                   <SelectItem value="vip">VIP (Cannot login, QR only)</SelectItem>
                   <SelectItem value="ops">Ops (Magic link login)</SelectItem>
                   <SelectItem value="admin">Admin (Google OAuth login)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Ticket type</label>
+              <Select
+                value={editTicketTypeId ?? '__none__'}
+                onValueChange={(v) => setEditTicketTypeId(v === '__none__' ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No ticket" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No ticket</SelectItem>
+                  {(ticketTypesData?.ticketTypes ?? []).map((tt) => (
+                    <SelectItem key={tt.id} value={tt.id}>
+                      {tt.name} ({tt.code})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

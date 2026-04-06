@@ -1,7 +1,7 @@
 import { startTransition, useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { CheckCircle2, Clock, QrCode, User, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, QrCode, User, X } from 'lucide-react';
 import { CheckinTypeCategoryEnum, ParticipantTypeEnum } from '@base/core/config/constant';
 import { EVENT_NAME_SHORT } from '@base/core/config/event';
 import { Button } from '@base/ui/components/button';
@@ -29,14 +29,14 @@ export const Route = createFileRoute('/ops/')({
 type Mode = 'checkin' | 'status';
 
 type ScanResultPopupProps = {
-  type: 'success' | 'error' | 'duplicate';
+  type: 'success' | 'error' | 'duplicate' | 'ineligible';
   participantName: string;
   checkinTypeName: string;
   codesAssigned?: number;
   isVip?: boolean;
   existingCheckinTime?: Date;
-  /** Shown under the title for error and duplicate outcomes */
-  message?: string;
+  detailMessage?: string;
+  participantTicketTypeName?: string | null;
   onClose: () => void;
 };
 
@@ -53,7 +53,8 @@ function ScanResultPopup({
   codesAssigned,
   isVip,
   existingCheckinTime,
-  message,
+  detailMessage,
+  participantTicketTypeName,
   onClose,
 }: ScanResultPopupProps) {
   useEffect(() => {
@@ -90,6 +91,14 @@ function ScanResultPopup({
           title: 'text-red-800',
           text: 'text-red-700',
         };
+      case 'ineligible':
+        return {
+          bg: 'bg-orange-50',
+          border: 'border-orange-200',
+          icon: 'text-orange-600',
+          title: 'text-orange-900',
+          text: 'text-orange-800',
+        };
     }
   };
 
@@ -103,9 +112,11 @@ function ScanResultPopup({
             {type === 'success' && <CheckCircle2 className={`h-6 w-6 ${styles.icon}`} />}
             {type === 'duplicate' && <Clock className={`h-6 w-6 ${styles.icon}`} />}
             {type === 'error' && <X className={`h-6 w-6 ${styles.icon}`} />}
+            {type === 'ineligible' && <AlertTriangle className={`h-6 w-6 ${styles.icon}`} />}
             {type === 'success' && 'SUCCESS'}
             {type === 'duplicate' && 'ALREADY CHECKED IN'}
             {type === 'error' && 'ERROR'}
+            {type === 'ineligible' && 'NOT ELIGIBLE'}
           </DialogTitle>
         </DialogHeader>
         <div className={`space-y-3 ${styles.text}`}>
@@ -117,9 +128,15 @@ function ScanResultPopup({
               </p>
             )}
             <p className="mt-2 text-sm">{checkinTypeName}</p>
+            {type === 'ineligible' && participantTicketTypeName !== undefined && participantTicketTypeName !== null && (
+              <p className="mt-1 text-xs opacity-80">Guest ticket: {participantTicketTypeName}</p>
+            )}
+            {detailMessage && type === 'ineligible' && (
+              <p className="mt-2 text-center text-sm font-medium">{detailMessage}</p>
+            )}
           </div>
-          {(type === 'error' || type === 'duplicate') && message && (
-            <p className="text-center text-sm font-medium leading-snug">{message}</p>
+          {(type === 'error' || type === 'duplicate') && detailMessage && (
+            <p className="text-center text-sm font-medium leading-snug">{detailMessage}</p>
           )}
           {type === 'success' && codesAssigned !== undefined && codesAssigned > 0 && (
             <p className="text-center text-sm font-medium">{codesAssigned} codes assigned</p>
@@ -150,6 +167,9 @@ function GuestStatusPopup({ result, onClose, onScanAnother }: GuestStatusPopupPr
           <div className="space-y-4">
             <div>
               <h3 className="text-lg font-semibold">{result.participant.name}</h3>
+              {result.participant.ticketTypeName && (
+                <p className="mt-1 text-sm text-gray-600">Ticket: {result.participant.ticketTypeName}</p>
+              )}
               {result.participant.participantType === ParticipantTypeEnum.vip && (
                 <span className="mt-1 inline-block rounded-full bg-yellow-100 px-2 py-1 text-xs font-medium">
                   ⭐ VIP ⭐
@@ -264,15 +284,28 @@ function OpsDashboardPage() {
             onClose: handleCloseSuccess,
           });
         } else {
-          const duplicate = result.error === 'Already checked in';
-          setScanResult({
-            type: duplicate ? 'duplicate' : 'error',
-            participantName: result.participant?.name || 'Unknown',
-            checkinTypeName: checkinTypesData?.checkinTypes.find((t) => t.id === selectedCheckinTypeId)?.name || '',
-            existingCheckinTime: result.existingCheckinTime,
-            message: duplicate ? 'Already checked in for this station.' : result.error,
-            onClose: handleCloseError,
-          });
+          const checkinTypeName =
+            checkinTypesData?.checkinTypes.find((t) => t.id === selectedCheckinTypeId)?.name || '';
+          if (result.ineligible) {
+            setScanResult({
+              type: 'ineligible',
+              participantName: result.participant?.name || 'Unknown',
+              checkinTypeName: result.checkinTypeName ?? checkinTypeName,
+              detailMessage: result.error,
+              participantTicketTypeName: result.participantTicketTypeName,
+              onClose: handleCloseError,
+            });
+          } else {
+            const duplicate = result.error === 'Already checked in';
+            setScanResult({
+              type: duplicate ? 'duplicate' : 'error',
+              participantName: result.participant?.name || 'Unknown',
+              checkinTypeName,
+              existingCheckinTime: result.existingCheckinTime,
+              detailMessage: duplicate ? 'Already checked in for this station.' : result.error,
+              onClose: handleCloseError,
+            });
+          }
         }
       });
     },
@@ -282,7 +315,7 @@ function OpsDashboardPage() {
           type: 'error',
           participantName: 'Unknown',
           checkinTypeName: checkinTypesData?.checkinTypes.find((t) => t.id === selectedCheckinTypeId)?.name || '',
-          message: _error instanceof Error ? _error.message : 'Check-in request failed',
+          detailMessage: _error instanceof Error ? _error.message : 'Check-in request failed',
           onClose: handleCloseError,
         });
       });
@@ -312,17 +345,21 @@ function OpsDashboardPage() {
 
   const handleScan = useCallback(
     (decodedText: string) => {
-      startTransition(() => {
-        setScannerPaused(true);
-      });
-
       if (mode === 'checkin') {
-        if (!selectedCheckinTypeId) return;
+        if (!selectedCheckinTypeId) {
+          return;
+        }
+        startTransition(() => {
+          setScannerPaused(true);
+        });
         processCheckinMutation.mutate({
           qrValue: decodedText,
           checkinTypeId: selectedCheckinTypeId,
         });
       } else {
+        startTransition(() => {
+          setScannerPaused(true);
+        });
         getGuestStatusMutation.mutate({ qrValue: decodedText });
       }
     },
@@ -394,6 +431,7 @@ function OpsDashboardPage() {
                       </span>
                     </div>
                     {type.description && <p className="mt-1 text-sm text-gray-600">{type.description}</p>}
+                    <p className="mt-1 text-xs text-gray-500">{type.ticketEligibilitySummary}</p>
                   </div>
                 </label>
               ))}

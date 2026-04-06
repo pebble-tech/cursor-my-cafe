@@ -9,10 +9,16 @@ import {
   type CheckinTypeCategory,
   type CodeStatus,
 } from '../../../config/constant';
+import {
+  CheckinTypeTicketTypesTable,
+  type CheckinTypeTicketType,
+  type NewCheckinTypeTicketType,
+} from './checkin-type-ticket-types.sql';
 import { CheckinRecordsTable, type CheckinRecord, type NewCheckinRecord } from './checkin-records.sql';
 import { CheckinTypesTable, type CheckinType, type NewCheckinType } from './checkin-types.sql';
 import { CodesTable, type Code, type NewCode } from './codes.sql';
 import { CreditTypesTable, type CreditType, type NewCreditType } from './credit-types.sql';
+import { TicketTypesTable, type NewTicketType, type TicketType } from './ticket-types.sql';
 
 export const usersRelations = relations(UsersTable, ({ many, one }) => ({
   assignedCodes: many(CodesTable, { relationName: 'assignedCodes' }),
@@ -22,6 +28,10 @@ export const usersRelations = relations(UsersTable, ({ many, one }) => ({
     fields: [UsersTable.checkedInBy],
     references: [UsersTable.id],
     relationName: 'checkedInByUser',
+  }),
+  ticketType: one(TicketTypesTable, {
+    fields: [UsersTable.ticketTypeId],
+    references: [TicketTypesTable.id],
   }),
 }));
 
@@ -41,8 +51,24 @@ export const codesRelations = relations(CodesTable, ({ one }) => ({
   }),
 }));
 
+export const ticketTypesRelations = relations(TicketTypesTable, ({ many }) => ({
+  checkinTypeLinks: many(CheckinTypeTicketTypesTable),
+}));
+
+export const checkinTypeTicketTypesRelations = relations(CheckinTypeTicketTypesTable, ({ one }) => ({
+  checkinType: one(CheckinTypesTable, {
+    fields: [CheckinTypeTicketTypesTable.checkinTypeId],
+    references: [CheckinTypesTable.id],
+  }),
+  ticketType: one(TicketTypesTable, {
+    fields: [CheckinTypeTicketTypesTable.ticketTypeId],
+    references: [TicketTypesTable.id],
+  }),
+}));
+
 export const checkinTypesRelations = relations(CheckinTypesTable, ({ many }) => ({
   checkinRecords: many(CheckinRecordsTable),
+  ticketTypeLinks: many(CheckinTypeTicketTypesTable),
 }));
 
 export const checkinRecordsRelations = relations(CheckinRecordsTable, ({ one }) => ({
@@ -73,3 +99,13 @@ export {
   type CheckinTypeCategory,
 };
 export { CheckinRecordsTable, type CheckinRecord, type NewCheckinRecord };
+export {
+  TicketTypesTable,
+  type TicketType,
+  type NewTicketType,
+};
+export {
+  CheckinTypeTicketTypesTable,
+  type CheckinTypeTicketType,
+  type NewCheckinTypeTicketType,
+};

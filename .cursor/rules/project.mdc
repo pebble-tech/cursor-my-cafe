@@ -49,11 +49,16 @@ This is a monorepo project using PNPM. Core frameworks and packages:
 - Use `...timestamps` for automatic createdAt/updatedAt fields
 
 ### Code Organization
-- Always use `~/*` path alias when importing files within the same package
+- Use `~/*` path aliases for imports within the same package. Use relative imports only when the alias is unavailable.
 - Use `@base/core/*` for core package imports
 - Use `@base/ui/*` for UI package imports
 - Always use `logging.ts` util for application logs, avoid using console.log directly unless for temporary debugging
 - No inline await import, always use high level import unless instruct for code-spliting or perf improvement
+- Layer boundaries: routes render, apis orchestrate, core decides.
+- Keep route files focused on UI composition, local state, and query wiring.
+- Keep server functions focused on auth, validation, and orchestration.
+- Put reusable business rules and policy decisions in `packages/core`.
+- When the same business rule shows up in multiple app-layer files, extract it to a shared core helper before the implementations drift.
 
 ### TypeScript & Quality
 - Follow TypeScript best practices strictly

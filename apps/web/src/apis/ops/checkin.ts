@@ -1,12 +1,15 @@
 import { createServerFn } from '@tanstack/react-start';
 
 import { UsersTable } from '@base/core/auth/schema';
+import { evaluateTicketEligibilityForCheckinType } from '@base/core/business.server/events/checkin-type-ticket-eligibility';
 import { resolveOpsCheckinScan } from '@base/core/business.server/ops/resolve-ops-checkin-scan';
 import {
   CheckinRecordsTable,
+  CheckinTypeTicketTypesTable,
   CheckinTypesTable,
   CodesTable,
   CreditTypesTable,
+  TicketTypesTable,
 } from '@base/core/business.server/events/schemas/schema';
 import {
   CheckinTypeCategoryEnum,
@@ -50,6 +53,9 @@ export type ProcessCheckinResult =
   | {
       success: false;
       error: string;
+      ineligible?: boolean;
+      checkinTypeName?: string;
+      participantTicketTypeName?: string | null;
       participant?: {
         id: string;
         name: string;
@@ -78,7 +84,28 @@ export const processCheckin = createServerFn({ method: 'POST' })
       return { success: false, error: resolved.error };
     }
 
-    const { participant } = resolved;
+    const participantRows = await db
+      .select({
+        id: UsersTable.id,
+        name: UsersTable.name,
+        email: UsersTable.email,
+        participantType: UsersTable.participantType,
+        qrCodeValue: UsersTable.qrCodeValue,
+        status: UsersTable.status,
+        ticketTypeId: UsersTable.ticketTypeId,
+        ticketTypeName: TicketTypesTable.name,
+      })
+      .from(UsersTable)
+      .leftJoin(TicketTypesTable, eq(UsersTable.ticketTypeId, TicketTypesTable.id))
+      .where(eq(UsersTable.id, resolved.participant.id))
+      .limit(1);
+
+    const participant = participantRows[0];
+
+    if (!participant) {
+      return { success: false, error: 'Participant not found' };
+    }
+
     const participantId = participant.id;
 
     const checkinType = await db.query.checkinTypes.findFirst({
@@ -107,6 +134,41 @@ export const processCheckin = createServerFn({ method: 'POST' })
           participantType: participant.participantType,
         },
         existingCheckinTime: existingCheckin.checkedInAt,
+      };
+    }
+
+    const allowedLinks = await db
+      .select({
+        ticketTypeId: CheckinTypeTicketTypesTable.ticketTypeId,
+        isActive: TicketTypesTable.isActive,
+      })
+      .from(CheckinTypeTicketTypesTable)
+      .innerJoin(
+        TicketTypesTable,
+        eq(CheckinTypeTicketTypesTable.ticketTypeId, TicketTypesTable.id)
+      )
+      .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, checkinTypeId));
+
+    const eligibility = evaluateTicketEligibilityForCheckinType({
+      checkinTypeName: checkinType.name,
+      participantTicketTypeId: participant.ticketTypeId,
+      participantTicketTypeName: participant.ticketTypeName,
+      linkedTicketTypes: allowedLinks,
+    });
+
+    if (!eligibility.eligible) {
+      return {
+        success: false,
+        error: eligibility.message,
+        ineligible: true,
+        checkinTypeName: checkinType.name,
+        participantTicketTypeName: eligibility.participantTicketTypeName,
+        participant: {
+          id: participant.id,
+          name: participant.name,
+          email: participant.email,
+          participantType: participant.participantType,
+        },
       };
     }
 
@@ -266,6 +328,7 @@ export type GuestStatusResult =
         name: string;
         email: string;
         participantType: string;
+        ticketTypeName: string | null;
       };
       checkinStatuses: Array<{
         checkinTypeId: string;
@@ -297,6 +360,14 @@ export const getGuestStatus = createServerFn({ method: 'POST' })
     const { participant } = resolved;
     const participantId = participant.id;
 
+    let ticketTypeName: string | null = null;
+    if (participant.ticketTypeId) {
+      const tt = await db.query.ticketTypes.findFirst({
+        where: eq(TicketTypesTable.id, participant.ticketTypeId),
+      });
+      ticketTypeName = tt?.name ?? null;
+    }
+
     const checkinTypes = await db
       .select()
       .from(CheckinTypesTable)
@@ -322,6 +393,7 @@ export const getGuestStatus = createServerFn({ method: 'POST' })
         name: participant.name,
         email: participant.email,
         participantType: participant.participantType,
+        ticketTypeName,
       },
       checkinStatuses,
     };
