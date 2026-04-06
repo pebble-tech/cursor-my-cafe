@@ -294,8 +294,7 @@ export const importParticipants = createServerFn({ method: 'POST' })
         name: TicketTypesTable.name,
         lumaTicketTypeId: TicketTypesTable.lumaTicketTypeId,
       })
-      .from(TicketTypesTable)
-      .where(eq(TicketTypesTable.isActive, true));
+      .from(TicketTypesTable);
 
     const { byLumaId, byName } = buildTicketTypeLookupMaps(ticketTypeRows);
 

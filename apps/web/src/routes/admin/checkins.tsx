@@ -451,7 +451,7 @@ type CheckinTypeFormProps = {
       allowedTicketTypeIds: string[];
     }>
   >;
-  ticketTypes: Array<{ id: string; name: string; code: string }>;
+  ticketTypes: Array<{ id: string; name: string; code: string; isActive: boolean }>;
   ticketTypesLoading: boolean;
   ticketTypesQueryError: Error | null;
   error: Error | null;
@@ -532,7 +532,10 @@ function CheckinTypeForm({
 
       <div className="space-y-2">
         <label className="text-sm font-medium">Allowed ticket types</label>
-        <p className="text-xs text-gray-500">Leave none selected for all tickets. Otherwise only linked ticket types may use this check-in.</p>
+        <p className="text-xs text-gray-500">
+          Leave none selected for all tickets. Otherwise only linked ticket types may use this check-in. At scan time, only
+          active ticket types count; inactive linked types are shown below but do not grant access until reactivated.
+        </p>
         {ticketTypesLoading ? (
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -548,10 +551,13 @@ function CheckinTypeForm({
         ) : (
           <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">
             {ticketTypes.map((tt) => (
-              <label key={tt.id} className="flex cursor-pointer items-center gap-2 text-sm">
+              <label
+                key={tt.id}
+                className={`flex cursor-pointer items-center gap-2 text-sm ${!tt.isActive ? 'text-amber-900/90' : ''}`}
+              >
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 shrink-0 rounded border-gray-300"
                   checked={formData.allowedTicketTypeIds.includes(tt.id)}
                   onChange={(e) => {
                     setFormData((prev) => ({
@@ -564,6 +570,11 @@ function CheckinTypeForm({
                 />
                 <span>
                   {tt.name} <span className="text-gray-400">({tt.code})</span>
+                  {!tt.isActive && (
+                    <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">
+                      Inactive
+                    </span>
+                  )}
                 </span>
               </label>
             ))}
