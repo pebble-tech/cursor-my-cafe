@@ -1,18 +1,55 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
 
-import { CheckinRecordsTable, CheckinTypesTable } from '@base/core/business.server/events/schemas/schema';
+import {
+  formatTicketEligibilitySummary,
+  loadCheckinTypeTicketEligibility,
+} from '@base/core/business.server/events/checkin-type-ticket-eligibility';
+import {
+  CheckinRecordsTable,
+  CheckinTypeTicketTypesTable,
+  CheckinTypesTable,
+  TicketTypesTable,
+} from '@base/core/business.server/events/schemas/schema';
 import { CheckinTypeCategoryCodes } from '@base/core/config/constant';
-import { asc, count, db, eq } from '@base/core/drizzle.server';
+import { asc, count, db, eq, inArray } from '@base/core/drizzle.server';
 
 import { requireAdmin } from '~/apis/auth';
+
+export type CheckinTypeListItem = {
+  id: string;
+  name: string;
+  type: (typeof CheckinTypesTable.$inferSelect)['type'];
+  description: string | null;
+  displayOrder: number;
+  isActive: boolean;
+  createdAt: Date;
+  allowedTicketTypeIds: string[];
+  allowedTicketTypeNames: string[];
+  ticketEligibilitySummary: string;
+};
 
 export const listCheckinTypes = createServerFn({ method: 'GET' }).handler(async () => {
   await requireAdmin();
 
   const checkinTypes = await db.select().from(CheckinTypesTable).orderBy(asc(CheckinTypesTable.displayOrder));
 
-  return { checkinTypes };
+  const eligibility = await loadCheckinTypeTicketEligibility(db, checkinTypes.map((t) => t.id));
+
+  const list: CheckinTypeListItem[] = checkinTypes.map((t) => {
+    const e = eligibility.get(t.id);
+    const linkedTicketTypeIds = e?.linkedTicketTypeIds ?? [];
+    const activeTicketTypeNames = e?.activeTicketTypeNames ?? [];
+    const linkCount = e?.linkCount ?? 0;
+    return {
+      ...t,
+      allowedTicketTypeIds: linkedTicketTypeIds,
+      allowedTicketTypeNames: activeTicketTypeNames,
+      ticketEligibilitySummary: formatTicketEligibilitySummary(linkCount, activeTicketTypeNames),
+    };
+  });
+
+  return { checkinTypes: list };
 });
 
 const createCheckinTypeInputSchema = z.object({
@@ -21,6 +58,7 @@ const createCheckinTypeInputSchema = z.object({
   description: z.string().optional(),
   displayOrder: z.number().int().min(0),
   isActive: z.boolean().default(true),
+  allowedTicketTypeIds: z.array(z.string()).optional(),
 });
 
 export type CreateCheckinTypeInput = z.infer<typeof createCheckinTypeInputSchema>;
@@ -38,9 +76,51 @@ export const createCheckinType = createServerFn({ method: 'POST' })
       throw new Error('Check-in type with this name already exists');
     }
 
-    const [newCheckinType] = await db.insert(CheckinTypesTable).values(data).returning();
+    const { allowedTicketTypeIds, ...checkinValues } = data;
+    const normalizedAllowedTicketTypeIds = allowedTicketTypeIds
+      ? Array.from(new Set(allowedTicketTypeIds))
+      : undefined;
 
-    return { checkinType: newCheckinType };
+    const newCheckinType = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(CheckinTypesTable).values(checkinValues).returning();
+
+      if (normalizedAllowedTicketTypeIds?.length) {
+        const validIds = await tx
+          .select({ id: TicketTypesTable.id })
+          .from(TicketTypesTable)
+          .where(inArray(TicketTypesTable.id, normalizedAllowedTicketTypeIds));
+
+        const idSet = new Set(validIds.map((r) => r.id));
+        const unknown = normalizedAllowedTicketTypeIds.filter((ticketTypeId) => !idSet.has(ticketTypeId));
+        if (unknown.length > 0) {
+          throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
+        }
+
+        await tx.insert(CheckinTypeTicketTypesTable).values(
+          normalizedAllowedTicketTypeIds.map((ticketTypeId) => ({
+            checkinTypeId: created.id,
+            ticketTypeId,
+          }))
+        );
+      }
+
+      return created;
+    });
+
+    const eligibility = await loadCheckinTypeTicketEligibility(db, [newCheckinType.id]);
+    const links = eligibility.get(newCheckinType.id);
+
+    return {
+      checkinType: {
+        ...newCheckinType,
+        allowedTicketTypeIds: links?.linkedTicketTypeIds ?? [],
+        allowedTicketTypeNames: links?.activeTicketTypeNames ?? [],
+        ticketEligibilitySummary: formatTicketEligibilitySummary(
+          links?.linkCount ?? 0,
+          links?.activeTicketTypeNames ?? []
+        ),
+      } satisfies CheckinTypeListItem,
+    };
   });
 
 const updateCheckinTypeInputSchema = z.object({
@@ -50,6 +130,7 @@ const updateCheckinTypeInputSchema = z.object({
   description: z.string().optional(),
   displayOrder: z.number().int().min(0).optional(),
   isActive: z.boolean().optional(),
+  allowedTicketTypeIds: z.array(z.string()).optional(),
 });
 
 export type UpdateCheckinTypeInput = z.infer<typeof updateCheckinTypeInputSchema>;
@@ -59,7 +140,9 @@ export const updateCheckinType = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     await requireAdmin();
 
-    const { id, ...updateData } = data;
+    const { id, allowedTicketTypeIds, ...updateData } = data;
+    const normalizedAllowedTicketTypeIds =
+      allowedTicketTypeIds !== undefined ? Array.from(new Set(allowedTicketTypeIds)) : undefined;
 
     if (updateData.name) {
       const existing = await db.query.checkinTypes.findFirst({
@@ -71,17 +154,78 @@ export const updateCheckinType = createServerFn({ method: 'POST' })
       }
     }
 
-    const [updatedCheckinType] = await db
-      .update(CheckinTypesTable)
-      .set(updateData)
-      .where(eq(CheckinTypesTable.id, id))
-      .returning();
+    let updatedCheckinType = await db.query.checkinTypes.findFirst({
+      where: eq(CheckinTypesTable.id, id),
+    });
 
     if (!updatedCheckinType) {
       throw new Error('Check-in type not found');
     }
 
-    return { checkinType: updatedCheckinType };
+    if (Object.keys(updateData).length > 0 || allowedTicketTypeIds !== undefined) {
+      await db.transaction(async (tx) => {
+        if (Object.keys(updateData).length > 0) {
+          const [row] = await tx
+            .update(CheckinTypesTable)
+            .set(updateData)
+            .where(eq(CheckinTypesTable.id, id))
+            .returning();
+          if (row) {
+            updatedCheckinType = row;
+          }
+        }
+
+        if (normalizedAllowedTicketTypeIds !== undefined) {
+          if (normalizedAllowedTicketTypeIds.length > 0) {
+            const validIds = await tx
+              .select({ id: TicketTypesTable.id })
+              .from(TicketTypesTable)
+              .where(inArray(TicketTypesTable.id, normalizedAllowedTicketTypeIds));
+
+            const idSet = new Set(validIds.map((r) => r.id));
+            const unknown = normalizedAllowedTicketTypeIds.filter((ticketTypeId) => !idSet.has(ticketTypeId));
+            if (unknown.length > 0) {
+              throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
+            }
+          }
+
+          await tx
+            .delete(CheckinTypeTicketTypesTable)
+            .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, id));
+
+          if (normalizedAllowedTicketTypeIds.length > 0) {
+            await tx.insert(CheckinTypeTicketTypesTable).values(
+              normalizedAllowedTicketTypeIds.map((ticketTypeId) => ({
+                checkinTypeId: id,
+                ticketTypeId,
+              }))
+            );
+          }
+        }
+      });
+    }
+
+    const latest = await db.query.checkinTypes.findFirst({
+      where: eq(CheckinTypesTable.id, id),
+    });
+    if (latest) {
+      updatedCheckinType = latest;
+    }
+
+    const eligibility = await loadCheckinTypeTicketEligibility(db, [id]);
+    const links = eligibility.get(id);
+
+    return {
+      checkinType: {
+        ...updatedCheckinType,
+        allowedTicketTypeIds: links?.linkedTicketTypeIds ?? [],
+        allowedTicketTypeNames: links?.activeTicketTypeNames ?? [],
+        ticketEligibilitySummary: formatTicketEligibilitySummary(
+          links?.linkCount ?? 0,
+          links?.activeTicketTypeNames ?? []
+        ),
+      } satisfies CheckinTypeListItem,
+    };
   });
 
 const toggleCheckinTypeActiveInputSchema = z.object({

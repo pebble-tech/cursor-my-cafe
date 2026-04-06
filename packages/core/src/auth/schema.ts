@@ -1,6 +1,7 @@
 import { boolean, index, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
 import { ParticipantStatusCodes, ParticipantTypeCodes, UserRoleCodes } from '../config/constant';
+import { TicketTypesTable } from '../business.server/events/schemas/ticket-types.sql';
 
 export const UsersTable = pgTable(
   'users',
@@ -26,8 +27,10 @@ export const UsersTable = pgTable(
     checkedInBy: text('checked_in_by'),
     qrCodeValue: text('qr_code_value'),
     welcomeEmailSentAt: timestamp('welcome_email_sent_at'),
+    ticketTypeId: text('ticket_type_id').references(() => TicketTypesTable.id, { onDelete: 'restrict' }),
   },
   (table) => [
+    index('users_ticket_type_id_idx').on(table.ticketTypeId),
     index('users_luma_id_idx').on(table.lumaId),
     index('users_status_idx').on(table.status),
     index('users_role_idx').on(table.role),

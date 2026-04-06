@@ -19,6 +19,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OpsIndexRouteImport } from './routes/ops/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminTicketTypesRouteImport } from './routes/admin/ticket-types'
 import { Route as AdminParticipantsRouteImport } from './routes/admin/participants'
 import { Route as AdminCreditsRouteImport } from './routes/admin/credits'
 import { Route as AdminCheckinsRouteImport } from './routes/admin/checkins'
@@ -66,6 +67,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminTicketTypesRoute = AdminTicketTypesRouteImport.update({
+  id: '/ticket-types',
+  path: '/ticket-types',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminParticipantsRoute = AdminParticipantsRouteImport.update({
   id: '/participants',
   path: '/participants',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/admin/checkins': typeof AdminCheckinsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/participants': typeof AdminParticipantsRoute
+  '/admin/ticket-types': typeof AdminTicketTypesRoute
   '/admin/': typeof AdminIndexRoute
   '/ops/': typeof OpsIndexRoute
 }
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/admin/checkins': typeof AdminCheckinsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/participants': typeof AdminParticipantsRoute
+  '/admin/ticket-types': typeof AdminTicketTypesRoute
   '/admin': typeof AdminIndexRoute
   '/ops': typeof OpsIndexRoute
 }
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/admin/checkins': typeof AdminCheckinsRoute
   '/admin/credits': typeof AdminCreditsRoute
   '/admin/participants': typeof AdminParticipantsRoute
+  '/admin/ticket-types': typeof AdminTicketTypesRoute
   '/admin/': typeof AdminIndexRoute
   '/ops/': typeof OpsIndexRoute
 }
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/admin/checkins'
     | '/admin/credits'
     | '/admin/participants'
+    | '/admin/ticket-types'
     | '/admin/'
     | '/ops/'
   fileRoutesByTo: FileRoutesByTo
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/admin/checkins'
     | '/admin/credits'
     | '/admin/participants'
+    | '/admin/ticket-types'
     | '/admin'
     | '/ops'
   id:
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/admin/checkins'
     | '/admin/credits'
     | '/admin/participants'
+    | '/admin/ticket-types'
     | '/admin/'
     | '/ops/'
   fileRoutesById: FileRoutesById
@@ -253,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/ticket-types': {
+      id: '/admin/ticket-types'
+      path: '/ticket-types'
+      fullPath: '/admin/ticket-types'
+      preLoaderRoute: typeof AdminTicketTypesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/participants': {
       id: '/admin/participants'
       path: '/participants'
@@ -292,6 +311,7 @@ interface AdminRouteChildren {
   AdminCheckinsRoute: typeof AdminCheckinsRoute
   AdminCreditsRoute: typeof AdminCreditsRoute
   AdminParticipantsRoute: typeof AdminParticipantsRoute
+  AdminTicketTypesRoute: typeof AdminTicketTypesRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -299,6 +319,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminCheckinsRoute: AdminCheckinsRoute,
   AdminCreditsRoute: AdminCreditsRoute,
   AdminParticipantsRoute: AdminParticipantsRoute,
+  AdminTicketTypesRoute: AdminTicketTypesRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
