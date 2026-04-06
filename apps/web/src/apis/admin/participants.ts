@@ -190,40 +190,74 @@ export const importParticipants = createServerFn({ method: 'POST' })
     const { participants } = data;
 
     if (participants.length === 0) {
-      return { imported: 0, skipped: [] as SkippedRow[] };
+      return { imported: 0, updated: 0, skipped: [] as SkippedRow[] };
     }
 
-    const emails = participants.map((p) => p.email.toLowerCase().trim());
+    const emails = [...new Set(participants.map((p) => p.email.toLowerCase().trim()))];
     const existingUsers = await db
-      .select({ email: UsersTable.email })
+      .select({
+        id: UsersTable.id,
+        email: UsersTable.email,
+        role: UsersTable.role,
+        lumaId: UsersTable.lumaId,
+      })
       .from(UsersTable)
       .where(inArray(UsersTable.email, emails));
 
-    const existingEmails = new Set(existingUsers.map((u) => u.email));
+    const existingByEmail = new Map(existingUsers.map((u) => [u.email, u]));
 
     const toInsert: (typeof UsersTable.$inferInsert)[] = [];
+    const toUpdate: Array<{ id: string; name: string; lumaId: string | null }> = [];
     const skipped: SkippedRow[] = [];
+    const pendingInsertEmails = new Set<string>();
+    const pendingUpdateIds = new Set<string>();
 
     participants.forEach((p, index) => {
       const normalizedEmail = p.email.toLowerCase().trim();
+      const rowNum = index + 1;
 
-      if (existingEmails.has(normalizedEmail)) {
-        skipped.push({
-          row: index + 1,
-          email: normalizedEmail,
-          reason: 'Email already registered',
+      const existing = existingByEmail.get(normalizedEmail);
+
+      if (existing) {
+        if (existing.role !== UserRoleEnum.participant) {
+          skipped.push({
+            row: rowNum,
+            email: normalizedEmail,
+            reason: 'Email already belongs to a non-participant account',
+          });
+          return;
+        }
+
+        if (pendingUpdateIds.has(existing.id)) {
+          skipped.push({
+            row: rowNum,
+            email: normalizedEmail,
+            reason: 'Duplicate email in import file',
+          });
+          return;
+        }
+
+        pendingUpdateIds.add(existing.id);
+        const nextLumaId =
+          p.lumaId && p.lumaId.trim().length > 0 ? p.lumaId.trim() : (existing.lumaId ?? null);
+        toUpdate.push({
+          id: existing.id,
+          name: p.name,
+          lumaId: nextLumaId,
         });
         return;
       }
 
-      if (toInsert.some((u) => u.email === normalizedEmail)) {
+      if (pendingInsertEmails.has(normalizedEmail)) {
         skipped.push({
-          row: index + 1,
+          row: rowNum,
           email: normalizedEmail,
           reason: 'Duplicate email in import file',
         });
         return;
       }
+
+      pendingInsertEmails.add(normalizedEmail);
 
       const userId = cuid();
       const qrCodeValue = generateQRCodeValue(userId);
@@ -250,7 +284,7 @@ export const importParticipants = createServerFn({ method: 'POST' })
         role,
         participantType,
         status: ParticipantStatusEnum.registered,
-        lumaId: p.lumaId || null,
+        lumaId: p.lumaId?.trim() ? p.lumaId.trim() : null,
         qrCodeValue,
       });
     });
@@ -263,8 +297,21 @@ export const importParticipants = createServerFn({ method: 'POST' })
       }
     }
 
+    let updated = 0;
+    for (const u of toUpdate) {
+      await db
+        .update(UsersTable)
+        .set({
+          name: u.name,
+          lumaId: u.lumaId,
+        })
+        .where(eq(UsersTable.id, u.id));
+      updated += 1;
+    }
+
     return {
       imported: toInsert.length,
+      updated,
       skipped,
     };
   });

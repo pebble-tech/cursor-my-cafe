@@ -250,6 +250,7 @@ function ParticipantsPage() {
 
   const [importResult, setImportResult] = useState<{
     imported: number;
+    updated: number;
     skipped: Array<{ row: number; email: string; reason: string }>;
   } | null>(null);
 
@@ -615,7 +616,7 @@ function ParticipantsPage() {
                 <DialogTitle>Import Participants</DialogTitle>
                 <DialogDescription>
                   Upload a CSV file with columns: name, email, user_type (optional: regular/vip/ops/admin, defaults to
-                  regular), luma_id (optional)
+                  regular), luma_id or api_id (optional, for Luma QR check-in)
                 </DialogDescription>
               </DialogHeader>
 
@@ -625,7 +626,7 @@ function ParticipantsPage() {
                     <CheckCircle2 className="h-5 w-5 text-green-600" />
                     <div>
                       <p className="font-medium text-green-800">
-                        Successfully imported {importResult.imported} participants
+                        Imported {importResult.imported} new, updated {importResult.updated} existing
                       </p>
                       {importResult.skipped.length > 0 && (
                         <p className="text-sm text-green-700">{importResult.skipped.length} rows skipped</p>

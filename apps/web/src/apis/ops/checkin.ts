@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 
 import { UsersTable } from '@base/core/auth/schema';
-import { verifyQRCodeValue } from '@base/core/business.server/events/events';
+import { resolveOpsCheckinScan } from '@base/core/business.server/ops/resolve-ops-checkin-scan';
 import {
   CheckinRecordsTable,
   CheckinTypesTable,
@@ -73,20 +73,13 @@ export const processCheckin = createServerFn({ method: 'POST' })
     const session = await requireOpsOrAdmin();
     const { qrValue, checkinTypeId } = data;
 
-    const qrVerification = verifyQRCodeValue(qrValue);
-    if (!qrVerification.valid) {
-      return { success: false, error: 'Invalid QR code' };
+    const resolved = await resolveOpsCheckinScan(db, qrValue);
+    if (!resolved.ok) {
+      return { success: false, error: resolved.error };
     }
 
-    const participantId = qrVerification.participantId;
-
-    const participant = await db.query.users.findFirst({
-      where: eq(UsersTable.id, participantId),
-    });
-
-    if (!participant) {
-      return { success: false, error: 'Participant not found' };
-    }
+    const { participant } = resolved;
+    const participantId = participant.id;
 
     const checkinType = await db.query.checkinTypes.findFirst({
       where: eq(CheckinTypesTable.id, checkinTypeId),
@@ -296,20 +289,13 @@ export const getGuestStatus = createServerFn({ method: 'POST' })
     await requireOpsOrAdmin();
     const { qrValue } = data;
 
-    const qrVerification = verifyQRCodeValue(qrValue);
-    if (!qrVerification.valid) {
-      return { success: false, error: 'Invalid QR code' };
+    const resolved = await resolveOpsCheckinScan(db, qrValue);
+    if (!resolved.ok) {
+      return { success: false, error: resolved.error };
     }
 
-    const participantId = qrVerification.participantId;
-
-    const participant = await db.query.users.findFirst({
-      where: eq(UsersTable.id, participantId),
-    });
-
-    if (!participant) {
-      return { success: false, error: 'Participant not found' };
-    }
+    const { participant } = resolved;
+    const participantId = participant.id;
 
     const checkinTypes = await db
       .select()

@@ -35,6 +35,8 @@ type ScanResultPopupProps = {
   codesAssigned?: number;
   isVip?: boolean;
   existingCheckinTime?: Date;
+  /** Shown under the title for error and duplicate outcomes */
+  message?: string;
   onClose: () => void;
 };
 
@@ -51,6 +53,7 @@ function ScanResultPopup({
   codesAssigned,
   isVip,
   existingCheckinTime,
+  message,
   onClose,
 }: ScanResultPopupProps) {
   useEffect(() => {
@@ -115,6 +118,9 @@ function ScanResultPopup({
             )}
             <p className="mt-2 text-sm">{checkinTypeName}</p>
           </div>
+          {(type === 'error' || type === 'duplicate') && message && (
+            <p className="text-center text-sm font-medium leading-snug">{message}</p>
+          )}
           {type === 'success' && codesAssigned !== undefined && codesAssigned > 0 && (
             <p className="text-center text-sm font-medium">{codesAssigned} codes assigned</p>
           )}
@@ -258,11 +264,13 @@ function OpsDashboardPage() {
             onClose: handleCloseSuccess,
           });
         } else {
+          const duplicate = result.error === 'Already checked in';
           setScanResult({
-            type: result.error === 'Already checked in' ? 'duplicate' : 'error',
+            type: duplicate ? 'duplicate' : 'error',
             participantName: result.participant?.name || 'Unknown',
             checkinTypeName: checkinTypesData?.checkinTypes.find((t) => t.id === selectedCheckinTypeId)?.name || '',
             existingCheckinTime: result.existingCheckinTime,
+            message: duplicate ? 'Already checked in for this station.' : result.error,
             onClose: handleCloseError,
           });
         }
@@ -274,6 +282,7 @@ function OpsDashboardPage() {
           type: 'error',
           participantName: 'Unknown',
           checkinTypeName: checkinTypesData?.checkinTypes.find((t) => t.id === selectedCheckinTypeId)?.name || '',
+          message: _error instanceof Error ? _error.message : 'Check-in request failed',
           onClose: handleCloseError,
         });
       });
@@ -393,7 +402,13 @@ function OpsDashboardPage() {
 
           <div className="rounded-lg border border-gray-200 bg-white p-6">
             <h2 className="mb-4 text-lg font-semibold">Scan QR Code</h2>
-            <QRScanner onScan={handleScan} paused={scannerPaused || processCheckinMutation.isPending} />
+            <QRScanner
+              onScan={handleScan}
+              paused={scannerPaused || processCheckinMutation.isPending}
+            />
+            {processCheckinMutation.isPending && (
+              <p className="mt-3 text-center text-sm text-muted-foreground">Verifying ticket…</p>
+            )}
           </div>
 
           {selectedCheckinType && checkinCount !== undefined && (
@@ -434,7 +449,13 @@ function OpsDashboardPage() {
         <TabsContent value="status" className="space-y-6">
           <div className="rounded-lg border border-gray-200 bg-white p-6">
             <h2 className="mb-4 text-lg font-semibold">Scan participant QR to view all statuses</h2>
-            <QRScanner onScan={handleScan} paused={scannerPaused || getGuestStatusMutation.isPending} />
+            <QRScanner
+              onScan={handleScan}
+              paused={scannerPaused || getGuestStatusMutation.isPending}
+            />
+            {getGuestStatusMutation.isPending && (
+              <p className="mt-3 text-center text-sm text-muted-foreground">Looking up guest…</p>
+            )}
           </div>
         </TabsContent>
       </Tabs>
