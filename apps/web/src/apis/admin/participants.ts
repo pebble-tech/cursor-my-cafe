@@ -331,6 +331,23 @@ export const importParticipants = createServerFn({ method: 'POST' })
         continue;
       }
 
+      const lumaKeySet = new Set(
+        resolutions.map((r) => {
+          const v = r.p.lumaId?.trim();
+          return v && v.length > 0 ? v : '__null__';
+        })
+      );
+      if (lumaKeySet.size > 1) {
+        for (const r of resolutions) {
+          skipped.push({
+            row: r.rowNumber,
+            email: normalizedEmail,
+            reason: 'Conflicting luma_id for same email in import file',
+          });
+        }
+        continue;
+      }
+
       const first = resolutions[0];
       const ticketTypeId = first.ticketTypeId;
 
@@ -429,26 +446,28 @@ export const importParticipants = createServerFn({ method: 'POST' })
     let inserted = 0;
     let updated = 0;
 
-    if (toInsert.length > 0) {
-      const batchSize = 100;
-      for (let i = 0; i < toInsert.length; i += batchSize) {
-        const batch = toInsert.slice(i, i + batchSize);
-        await db.insert(UsersTable).values(batch);
-        inserted += batch.length;
+    await db.transaction(async (tx) => {
+      if (toInsert.length > 0) {
+        const batchSize = 100;
+        for (let i = 0; i < toInsert.length; i += batchSize) {
+          const batch = toInsert.slice(i, i + batchSize);
+          await tx.insert(UsersTable).values(batch);
+          inserted += batch.length;
+        }
       }
-    }
 
-    for (const u of toUpdate) {
-      await db
-        .update(UsersTable)
-        .set({
-          name: u.name,
-          lumaId: u.lumaId,
-          ticketTypeId: u.ticketTypeId,
-        })
-        .where(eq(UsersTable.id, u.id));
-      updated += 1;
-    }
+      for (const u of toUpdate) {
+        await tx
+          .update(UsersTable)
+          .set({
+            name: u.name,
+            lumaId: u.lumaId,
+            ticketTypeId: u.ticketTypeId,
+          })
+          .where(eq(UsersTable.id, u.id));
+        updated += 1;
+      }
+    });
 
     return {
       inserted,
