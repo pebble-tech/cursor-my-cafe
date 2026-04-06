@@ -346,7 +346,7 @@ export const importParticipants = createServerFn({ method: 'POST' })
         role = UserRoleEnum.ops;
       } else if (c.userType === UserTypeEnum.admin) {
         role = UserRoleEnum.admin;
-      } else       if (c.userType === UserTypeEnum.regular) {
+      } else if (c.userType === UserTypeEnum.regular) {
         role = UserRoleEnum.participant;
         participantType = ParticipantTypeEnum.regular;
       }
