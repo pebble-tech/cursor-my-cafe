@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "ticket_types_name_unique" ON "ticket_types" USING btree ("name");

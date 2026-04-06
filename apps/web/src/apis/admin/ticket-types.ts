@@ -6,6 +6,7 @@ import {
   CheckinTypeTicketTypesTable,
   TicketTypesTable,
 } from '@base/core/business.server/events/schemas/schema';
+import { rethrowTicketTypeUniqueViolation } from '@base/core/db/postgres-errors';
 import { asc, count, db, eq } from '@base/core/drizzle.server';
 
 import { requireAdmin } from '~/apis/auth';
@@ -64,17 +65,25 @@ export const createTicketType = createServerFn({ method: 'POST' })
       throw new Error('A ticket type with this Luma ticket type ID already exists');
     }
 
-    const [created] = await db.insert(TicketTypesTable).values(payload).returning();
-    return { ticketType: created };
+    try {
+      const [created] = await db.insert(TicketTypesTable).values(payload).returning();
+      return { ticketType: created };
+    } catch (e) {
+      rethrowTicketTypeUniqueViolation(e);
+    }
   });
 
-const updateTicketTypeInputSchema = z.object({
-  id: z.string().min(1),
-  code: z.string().min(1).optional(),
-  name: z.string().min(1).optional(),
-  lumaTicketTypeId: z.string().min(1).optional(),
-  isActive: z.boolean().optional(),
-});
+const updateTicketTypeInputSchema = z
+  .object({
+    id: z.string().min(1),
+    code: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+    lumaTicketTypeId: z.string().min(1).optional(),
+    isActive: z.boolean().optional(),
+  })
+  .refine((d) => Object.keys(d).some((k) => k !== 'id'), {
+    message: 'At least one field besides id is required',
+  });
 
 export type UpdateTicketTypeInput = z.infer<typeof updateTicketTypeInputSchema>;
 
@@ -143,13 +152,17 @@ export const updateTicketType = createServerFn({ method: 'POST' })
       return { ticketType: current };
     }
 
-    const [updated] = await db
-      .update(TicketTypesTable)
-      .set(patch)
-      .where(eq(TicketTypesTable.id, id))
-      .returning();
+    try {
+      const [updated] = await db
+        .update(TicketTypesTable)
+        .set(patch)
+        .where(eq(TicketTypesTable.id, id))
+        .returning();
 
-    return { ticketType: updated };
+      return { ticketType: updated };
+    } catch (e) {
+      rethrowTicketTypeUniqueViolation(e);
+    }
   });
 
 const deleteTicketTypeInputSchema = z.object({

@@ -36,15 +36,42 @@ function buildTicketTypeLookupMaps(
   const byName = new Map<string, string>();
   for (const t of ticketTypes) {
     byLumaId.set(t.lumaTicketTypeId, t.id);
-    const existingId = byName.get(t.name);
-    if (existingId !== undefined && existingId !== t.id) {
-      throw new Error(
-        `Ambiguous ticket type name "${t.name}": multiple active ticket types share this name. Rename one before importing.`
-      );
-    }
     byName.set(t.name, t.id);
   }
   return { byLumaId, byName };
+}
+
+function importEmailGroupMergeConflicts(
+  resolutions: Array<{
+    rowNumber: number;
+    p: { name: string; lumaId?: string };
+    ticketTypeId: string | null;
+  }>
+): { ok: true } | { ok: false; reason: string } {
+  const dimensions: Array<{ values: string[]; reason: string }> = [
+    {
+      values: resolutions.map((r) => (r.ticketTypeId === null ? '__null__' : r.ticketTypeId)),
+      reason: 'Conflicting ticket data for same email in import file',
+    },
+    {
+      values: resolutions.map((r) => {
+        const v = r.p.lumaId?.trim();
+        return v && v.length > 0 ? v : '__null__';
+      }),
+      reason: 'Conflicting luma_id for same email in import file',
+    },
+    {
+      values: resolutions.map((r) => r.p.name.trim()),
+      reason: 'Conflicting name for same email in import file',
+    },
+  ];
+
+  for (const { values, reason } of dimensions) {
+    if (new Set(values).size > 1) {
+      return { ok: false, reason };
+    }
+  }
+  return { ok: true };
 }
 
 function resolveTicketTypeIdForImport(
@@ -317,32 +344,13 @@ export const importParticipants = createServerFn({ method: 'POST' })
         continue;
       }
 
-      const ticketKeySet = new Set(
-        resolutions.map((r) => (r.ticketTypeId === null ? '__null__' : r.ticketTypeId))
-      );
-      if (ticketKeySet.size > 1) {
+      const merge = importEmailGroupMergeConflicts(resolutions);
+      if (!merge.ok) {
         for (const r of resolutions) {
           skipped.push({
             row: r.rowNumber,
             email: normalizedEmail,
-            reason: 'Conflicting ticket data for same email in import file',
-          });
-        }
-        continue;
-      }
-
-      const lumaKeySet = new Set(
-        resolutions.map((r) => {
-          const v = r.p.lumaId?.trim();
-          return v && v.length > 0 ? v : '__null__';
-        })
-      );
-      if (lumaKeySet.size > 1) {
-        for (const r of resolutions) {
-          skipped.push({
-            row: r.rowNumber,
-            email: normalizedEmail,
-            reason: 'Conflicting luma_id for same email in import file',
+            reason: merge.reason,
           });
         }
         continue;

@@ -14,6 +14,7 @@ export const TicketTypesTable = pgTable(
   },
   (table) => [
     uniqueIndex('ticket_types_code_unique').on(table.code),
+    uniqueIndex('ticket_types_name_unique').on(table.name),
     uniqueIndex('ticket_types_luma_ticket_type_id_unique').on(table.lumaTicketTypeId),
     index('ticket_types_is_active_idx').on(table.isActive),
   ]
