@@ -1,14 +1,10 @@
 const LUMA_HOSTS = new Set(['luma.com', 'www.luma.com', 'lu.ma', 'www.lu.ma']);
 
 export type ParsedLumaCheckInUrl = {
-  /** `evt-…` segment from the path when present; otherwise a public slug. */
   pathEventKey: string;
   pk: string;
 };
 
-/**
- * Parses a Luma guest check-in QR URL: https://luma.com/check-in/{event}?pk=…
- */
 export function parseLumaCheckInUrl(raw: string): ParsedLumaCheckInUrl | null {
   const trimmed = raw.trim();
   if (!trimmed) {

@@ -5,8 +5,6 @@ const LUMA_API_BASE = 'https://public-api.luma.com';
 export type LumaGuestLookupOk = {
   ok: true;
   guestId: string;
-  /** Minimal fields for logs; avoid storing or logging full PII. */
-  diagnosticName: string | null;
 };
 
 export type LumaGuestLookupErrCode =
@@ -26,9 +24,7 @@ export type LumaGuestLookupResult = LumaGuestLookupOk | LumaGuestLookupErr;
 type LumaGetGuestJson = {
   guest?: {
     id?: string;
-    user_name?: string | null;
   } | null;
-  message?: string;
 };
 
 export async function lookupLumaGuestByCheckInKey(input: {
@@ -88,8 +84,5 @@ export async function lookupLumaGuestByCheckInKey(input: {
     return { ok: false, code: 'bad_response', status: response.status };
   }
 
-  const name = parsed.guest?.user_name;
-  const diagnosticName = typeof name === 'string' && name.trim() ? name.trim() : null;
-
-  return { ok: true, guestId, diagnosticName };
+  return { ok: true, guestId };
 }

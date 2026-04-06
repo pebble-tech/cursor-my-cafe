@@ -24,7 +24,7 @@ export const OPS_CHECKIN_ERROR = {
 export type ResolvedOpsParticipant = NonNullable<Awaited<ReturnType<typeof db.query.users.findFirst>>>;
 
 export type ResolveOpsScanResult =
-  | { ok: true; participant: ResolvedOpsParticipant; via: 'internal_qr' | 'luma_qr' }
+  | { ok: true; participant: ResolvedOpsParticipant }
   | { ok: false; error: string };
 
 export async function resolveOpsCheckinScan(db: DbClient, rawScan: string): Promise<ResolveOpsScanResult> {
@@ -36,7 +36,7 @@ export async function resolveOpsCheckinScan(db: DbClient, rawScan: string): Prom
     if (!participant) {
       return { ok: false, error: OPS_CHECKIN_ERROR.participantNotFound };
     }
-    return { ok: true, participant, via: 'internal_qr' };
+    return { ok: true, participant };
   }
 
   const lumaUrl = parseLumaCheckInUrl(rawScan);
@@ -83,8 +83,7 @@ export async function resolveOpsCheckinScan(db: DbClient, rawScan: string): Prom
   logInfo('Luma QR resolved to participant', {
     participantId: participant.id,
     guestId: lumaResult.guestId,
-    via: 'luma_qr',
   });
 
-  return { ok: true, participant, via: 'luma_qr' };
+  return { ok: true, participant };
 }
