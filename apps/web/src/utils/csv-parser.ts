@@ -9,8 +9,6 @@ export type ParsedParticipant = {
   userType: UserType;
   /** Luma ticket type id from CSV (e.g. evtticktyp-...) when column present */
   ticketLumaTypeId?: string;
-  /** Display name from Luma export; used to match `ticket_types.name` */
-  ticketName?: string;
 };
 
 export type ParsedRow = {
@@ -88,12 +86,10 @@ export function parseParticipantsCSV(csvContent: string): CSVParseResult {
       ticketTypeIdCol ||
       (row['luma_ticket_type_id'] || row['luma ticket type id'] || '').trim() ||
       undefined;
-    const ticketName =
-      (row['ticket_name'] || row['ticket name'] || row['ticket_type'] || '').trim() || undefined;
 
     const parsedRow: ParsedRow = {
       row: index + 1,
-      data: { name, email, lumaId, userType: 'regular', ticketLumaTypeId, ticketName },
+      data: { name, email, lumaId, userType: 'regular', ticketLumaTypeId },
       valid: true,
     };
 
@@ -113,12 +109,10 @@ export function parseParticipantsCSV(csvContent: string): CSVParseResult {
       parsedRow.data.userType = userTypeRaw as UserType;
       const needsTicket = userTypeRaw === 'regular';
       if (needsTicket) {
-        const hasTicketMeta = Boolean(
-          (ticketLumaTypeId && ticketLumaTypeId.length > 0) || (ticketName && ticketName.length > 0)
-        );
-        if (!hasTicketMeta) {
+        const hasTicketId = Boolean(ticketLumaTypeId && ticketLumaTypeId.length > 0);
+        if (!hasTicketId) {
           parsedRow.valid = false;
-          parsedRow.error = 'Ticket metadata required (ticket_type_id or ticket_name)';
+          parsedRow.error = 'Ticket type id required (ticket_type_id / Luma ticket type id)';
         }
       }
     }

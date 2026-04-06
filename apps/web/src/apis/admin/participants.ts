@@ -184,7 +184,6 @@ const importParticipantsInputSchema = z.object({
       lumaId: z.string().optional(),
       userType: z.enum(UserTypeCodes).default('regular'),
       ticketLumaTypeId: z.string().optional(),
-      ticketName: z.string().optional(),
     })
   ),
 });
@@ -216,7 +215,7 @@ export const importParticipants = createServerFn({ method: 'POST' })
       })
       .from(TicketTypesTable);
 
-    const { byLumaId, byName } = buildTicketTypeLookupMaps(ticketTypeRows);
+    const { byLumaId } = buildTicketTypeLookupMaps(ticketTypeRows);
 
     type CanonicalRow = (typeof participants)[number] & {
       ticketTypeId: string | null;
@@ -250,7 +249,7 @@ export const importParticipants = createServerFn({ method: 'POST' })
       const resolutions = group.map((g) => ({
         rowNumber: g.rowNumber,
         participant: g.p,
-        ...resolveTicketTypeIdForImport(g.p, byLumaId, byName),
+        ...resolveTicketTypeIdForImport(g.p, byLumaId),
       }));
 
       if (resolutions.some((r) => r.error)) {

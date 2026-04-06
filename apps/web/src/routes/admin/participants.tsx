@@ -345,7 +345,6 @@ function ParticipantsPage() {
         lumaId?: string;
         userType: UserType;
         ticketLumaTypeId?: string;
-        ticketName?: string;
       }>
     ) => importParticipants({ data: { participants } }),
     onSuccess: (result) => {
@@ -646,9 +645,9 @@ function ParticipantsPage() {
               <DialogHeader>
                 <DialogTitle>Import Participants</DialogTitle>
                 <DialogDescription>
-                  Columns: name, email, ticket_name (or ticket_type_id / Luma ticket type id), user_type (optional,
-                  defaults to regular), luma_id or api_id (optional, for Luma QR check-in). Regular participants require
-                  ticket metadata. Re-import updates name, Luma id, and ticket type for existing participant emails.
+                  Columns: name, email, ticket_type_id (Luma ticket type id, e.g. evtticktyp-…), user_type (optional,
+                  defaults to regular), luma_id or api_id (optional, for Luma QR check-in). Regular participants require a
+                  ticket type id. Re-import updates name, Luma id, and ticket type for existing participant emails.
                 </DialogDescription>
               </DialogHeader>
 
@@ -718,7 +717,7 @@ function ParticipantsPage() {
                                 <td className="px-3 py-2">{row.data.name}</td>
                                 <td className="px-3 py-2">{row.data.email}</td>
                                 <td className="px-3 py-2 text-xs text-gray-600">
-                                  {row.data.ticketLumaTypeId || row.data.ticketName || '—'}
+                                  {row.data.ticketLumaTypeId || '—'}
                                 </td>
                                 <td className="px-3 py-2">
                                   <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-800">
