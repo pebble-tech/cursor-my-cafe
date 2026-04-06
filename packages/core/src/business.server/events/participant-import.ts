@@ -1,4 +1,4 @@
-import { UserTypeEnum, type UserType } from '../../config/constant';
+import { UserTypeEnum, type UserType } from '~/config/constant';
 
 export type TicketTypeLookupRow = {
   id: string;
