@@ -339,17 +339,21 @@ function OpsDashboardPage() {
 
   const handleScan = useCallback(
     (decodedText: string) => {
-      startTransition(() => {
-        setScannerPaused(true);
-      });
-
       if (mode === 'checkin') {
-        if (!selectedCheckinTypeId) return;
+        if (!selectedCheckinTypeId) {
+          return;
+        }
+        startTransition(() => {
+          setScannerPaused(true);
+        });
         processCheckinMutation.mutate({
           qrValue: decodedText,
           checkinTypeId: selectedCheckinTypeId,
         });
       } else {
+        startTransition(() => {
+          setScannerPaused(true);
+        });
         getGuestStatusMutation.mutate({ qrValue: decodedText });
       }
     },

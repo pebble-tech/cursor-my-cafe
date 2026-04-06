@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start';
 
 import { UsersTable } from '@base/core/auth/schema';
+import { evaluateTicketEligibilityForCheckinType } from '@base/core/business.server/events/checkin-type-ticket-eligibility';
 import { verifyQRCodeValue } from '@base/core/business.server/events/events';
 import {
   CheckinRecordsTable,
@@ -85,9 +86,23 @@ export const processCheckin = createServerFn({ method: 'POST' })
 
     const participantId = qrVerification.participantId;
 
-    const participant = await db.query.users.findFirst({
-      where: eq(UsersTable.id, participantId),
-    });
+    const participantRows = await db
+      .select({
+        id: UsersTable.id,
+        name: UsersTable.name,
+        email: UsersTable.email,
+        participantType: UsersTable.participantType,
+        qrCodeValue: UsersTable.qrCodeValue,
+        status: UsersTable.status,
+        ticketTypeId: UsersTable.ticketTypeId,
+        ticketTypeName: TicketTypesTable.name,
+      })
+      .from(UsersTable)
+      .leftJoin(TicketTypesTable, eq(UsersTable.ticketTypeId, TicketTypesTable.id))
+      .where(eq(UsersTable.id, participantId))
+      .limit(1);
+
+    const participant = participantRows[0];
 
     if (!participant) {
       return { success: false, error: 'Participant not found' };
@@ -134,32 +149,27 @@ export const processCheckin = createServerFn({ method: 'POST' })
       )
       .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, checkinTypeId));
 
-    if (allowedLinks.length > 0) {
-      const allowedIds = new Set(allowedLinks.filter((l) => l.isActive).map((l) => l.ticketTypeId));
-      const participantTicketId = participant.ticketTypeId;
-      if (!participantTicketId || !allowedIds.has(participantTicketId)) {
-        let participantTicketTypeName: string | null = null;
-        if (participantTicketId) {
-          const tt = await db.query.ticketTypes.findFirst({
-            where: eq(TicketTypesTable.id, participantTicketId),
-          });
-          participantTicketTypeName = tt?.name ?? null;
-        }
+    const eligibility = evaluateTicketEligibilityForCheckinType({
+      checkinTypeName: checkinType.name,
+      participantTicketTypeId: participant.ticketTypeId,
+      participantTicketTypeName: participant.ticketTypeName,
+      linkedTicketTypes: allowedLinks,
+    });
 
-        return {
-          success: false,
-          error: `This ticket is not eligible for ${checkinType.name}`,
-          ineligible: true,
-          checkinTypeName: checkinType.name,
-          participantTicketTypeName,
-          participant: {
-            id: participant.id,
-            name: participant.name,
-            email: participant.email,
-            participantType: participant.participantType,
-          },
-        };
-      }
+    if (!eligibility.eligible) {
+      return {
+        success: false,
+        error: eligibility.message,
+        ineligible: true,
+        checkinTypeName: checkinType.name,
+        participantTicketTypeName: eligibility.participantTicketTypeName,
+        participant: {
+          id: participant.id,
+          name: participant.name,
+          email: participant.email,
+          participantType: participant.participantType,
+        },
+      };
     }
 
     const isFirstAttendance =

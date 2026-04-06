@@ -15,6 +15,21 @@ export type CheckinTypeTicketEligibility = {
   linkCount: number;
 };
 
+export type LinkedTicketType = {
+  ticketTypeId: string;
+  isActive: boolean;
+};
+
+export type TicketEligibilityEvaluation =
+  | {
+      eligible: true;
+    }
+  | {
+      eligible: false;
+      message: string;
+      participantTicketTypeName: string | null;
+    };
+
 const emptyEligibility = (): CheckinTypeTicketEligibility => ({
   linkedTicketTypeIds: [],
   activeTicketTypeNames: [],
@@ -30,6 +45,41 @@ export function formatTicketEligibilitySummary(linkCount: number, activeTicketTy
 export function summaryForLoadedEligibility(loaded: CheckinTypeTicketEligibility | undefined): string {
   const e = loaded ?? emptyEligibility();
   return formatTicketEligibilitySummary(e.linkCount, e.activeTicketTypeNames);
+}
+
+export function evaluateTicketEligibilityForCheckinType(args: {
+  checkinTypeName: string;
+  participantTicketTypeId: string | null;
+  participantTicketTypeName: string | null;
+  linkedTicketTypes: LinkedTicketType[];
+}): TicketEligibilityEvaluation {
+  const { checkinTypeName, participantTicketTypeId, participantTicketTypeName, linkedTicketTypes } = args;
+
+  if (linkedTicketTypes.length === 0) {
+    return { eligible: true };
+  }
+
+  const activeAllowedTicketTypeIds = new Set(
+    linkedTicketTypes.filter((ticketType) => ticketType.isActive).map((ticketType) => ticketType.ticketTypeId)
+  );
+
+  if (!participantTicketTypeId) {
+    return {
+      eligible: false,
+      message: `Participant has no eligible ticket assigned for ${checkinTypeName}`,
+      participantTicketTypeName,
+    };
+  }
+
+  if (!activeAllowedTicketTypeIds.has(participantTicketTypeId)) {
+    return {
+      eligible: false,
+      message: `This ticket is not eligible for ${checkinTypeName}`,
+      participantTicketTypeName,
+    };
+  }
+
+  return { eligible: true };
 }
 
 export async function loadCheckinTypeTicketEligibility(

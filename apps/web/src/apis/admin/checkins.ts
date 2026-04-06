@@ -77,24 +77,27 @@ export const createCheckinType = createServerFn({ method: 'POST' })
     }
 
     const { allowedTicketTypeIds, ...checkinValues } = data;
+    const normalizedAllowedTicketTypeIds = allowedTicketTypeIds
+      ? Array.from(new Set(allowedTicketTypeIds))
+      : undefined;
 
     const newCheckinType = await db.transaction(async (tx) => {
       const [created] = await tx.insert(CheckinTypesTable).values(checkinValues).returning();
 
-      if (allowedTicketTypeIds?.length) {
+      if (normalizedAllowedTicketTypeIds?.length) {
         const validIds = await tx
           .select({ id: TicketTypesTable.id })
           .from(TicketTypesTable)
-          .where(inArray(TicketTypesTable.id, allowedTicketTypeIds));
+          .where(inArray(TicketTypesTable.id, normalizedAllowedTicketTypeIds));
 
         const idSet = new Set(validIds.map((r) => r.id));
-        const unknown = allowedTicketTypeIds.filter((tid) => !idSet.has(tid));
+        const unknown = normalizedAllowedTicketTypeIds.filter((ticketTypeId) => !idSet.has(ticketTypeId));
         if (unknown.length > 0) {
           throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
         }
 
         await tx.insert(CheckinTypeTicketTypesTable).values(
-          allowedTicketTypeIds.map((ticketTypeId) => ({
+          normalizedAllowedTicketTypeIds.map((ticketTypeId) => ({
             checkinTypeId: created.id,
             ticketTypeId,
           }))
@@ -138,6 +141,8 @@ export const updateCheckinType = createServerFn({ method: 'POST' })
     await requireAdmin();
 
     const { id, allowedTicketTypeIds, ...updateData } = data;
+    const normalizedAllowedTicketTypeIds =
+      allowedTicketTypeIds !== undefined ? Array.from(new Set(allowedTicketTypeIds)) : undefined;
 
     if (updateData.name) {
       const existing = await db.query.checkinTypes.findFirst({
@@ -170,15 +175,15 @@ export const updateCheckinType = createServerFn({ method: 'POST' })
           }
         }
 
-        if (allowedTicketTypeIds !== undefined) {
-          if (allowedTicketTypeIds.length > 0) {
+        if (normalizedAllowedTicketTypeIds !== undefined) {
+          if (normalizedAllowedTicketTypeIds.length > 0) {
             const validIds = await tx
               .select({ id: TicketTypesTable.id })
               .from(TicketTypesTable)
-              .where(inArray(TicketTypesTable.id, allowedTicketTypeIds));
+              .where(inArray(TicketTypesTable.id, normalizedAllowedTicketTypeIds));
 
             const idSet = new Set(validIds.map((r) => r.id));
-            const unknown = allowedTicketTypeIds.filter((tid) => !idSet.has(tid));
+            const unknown = normalizedAllowedTicketTypeIds.filter((ticketTypeId) => !idSet.has(ticketTypeId));
             if (unknown.length > 0) {
               throw new Error(`Unknown ticket type id(s): ${unknown.join(', ')}`);
             }
@@ -188,9 +193,9 @@ export const updateCheckinType = createServerFn({ method: 'POST' })
             .delete(CheckinTypeTicketTypesTable)
             .where(eq(CheckinTypeTicketTypesTable.checkinTypeId, id));
 
-          if (allowedTicketTypeIds.length > 0) {
+          if (normalizedAllowedTicketTypeIds.length > 0) {
             await tx.insert(CheckinTypeTicketTypesTable).values(
-              allowedTicketTypeIds.map((ticketTypeId) => ({
+              normalizedAllowedTicketTypeIds.map((ticketTypeId) => ({
                 checkinTypeId: id,
                 ticketTypeId,
               }))

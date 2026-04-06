@@ -5,6 +5,12 @@ import { z } from 'zod';
 import { UsersTable } from '@base/core/auth/schema';
 import { generateQRCodeValue } from '@base/core/business.server/events/events';
 import {
+  buildImportParticipantUpdate,
+  buildTicketTypeLookupMaps,
+  importEmailGroupMergeConflicts,
+  resolveTicketTypeIdForImport,
+} from '@base/core/business.server/events/participant-import';
+import {
   CheckinRecordsTable,
   CheckinTypesTable,
   TicketTypesTable,
@@ -20,96 +26,10 @@ import {
   UserTypeEnum,
   type ParticipantType,
   type UserRole,
-  type UserType,
 } from '@base/core/config/constant';
 import { and, asc, count, db, desc, eq, ilike, inArray, or, type SQL } from '@base/core/drizzle.server';
 
 import { requireAdmin } from '~/apis/auth';
-
-function buildTicketTypeLookupMaps(
-  ticketTypes: Array<{ id: string; name: string; lumaTicketTypeId: string }>
-): {
-  byLumaId: Map<string, string>;
-  byName: Map<string, string>;
-} {
-  const byLumaId = new Map<string, string>();
-  const byName = new Map<string, string>();
-  for (const t of ticketTypes) {
-    byLumaId.set(t.lumaTicketTypeId, t.id);
-    byName.set(t.name, t.id);
-  }
-  return { byLumaId, byName };
-}
-
-function importEmailGroupMergeConflicts(
-  resolutions: Array<{
-    rowNumber: number;
-    p: { name: string; lumaId?: string };
-    ticketTypeId: string | null;
-  }>
-): { ok: true } | { ok: false; reason: string } {
-  const dimensions: Array<{ values: string[]; reason: string }> = [
-    {
-      values: resolutions.map((r) => (r.ticketTypeId === null ? '__null__' : r.ticketTypeId)),
-      reason: 'Conflicting ticket data for same email in import file',
-    },
-    {
-      values: resolutions.map((r) => {
-        const v = r.p.lumaId?.trim();
-        return v && v.length > 0 ? v : '__null__';
-      }),
-      reason: 'Conflicting luma_id for same email in import file',
-    },
-    {
-      values: resolutions.map((r) => r.p.name.trim()),
-      reason: 'Conflicting name for same email in import file',
-    },
-  ];
-
-  for (const { values, reason } of dimensions) {
-    if (new Set(values).size > 1) {
-      return { ok: false, reason };
-    }
-  }
-  return { ok: true };
-}
-
-function resolveTicketTypeIdForImport(
-  p: {
-    userType: UserType;
-    ticketLumaTypeId?: string;
-    ticketName?: string;
-  },
-  byLumaId: Map<string, string>,
-  byName: Map<string, string>
-): { ticketTypeId: string | null; error?: string } {
-  const luma = p.ticketLumaTypeId?.trim();
-  const name = p.ticketName?.trim();
-
-  const idFromLuma = luma ? byLumaId.get(luma) : undefined;
-  const idFromName = name ? byName.get(name) : undefined;
-
-  if (luma && idFromLuma === undefined) {
-    return { ticketTypeId: null, error: `Unknown ticket_type_id: ${luma}` };
-  }
-  if (name && idFromName === undefined) {
-    return { ticketTypeId: null, error: `Unknown ticket_name: ${name}` };
-  }
-  if (idFromLuma !== undefined && idFromName !== undefined && idFromLuma !== idFromName) {
-    return { ticketTypeId: null, error: 'Conflicting ticket_type_id and ticket_name for this row' };
-  }
-  if (idFromLuma !== undefined) {
-    return { ticketTypeId: idFromLuma };
-  }
-  if (idFromName !== undefined) {
-    return { ticketTypeId: idFromName };
-  }
-
-  if (p.userType === UserTypeEnum.regular) {
-    return { ticketTypeId: null, error: 'Ticket metadata required for regular participants' };
-  }
-  return { ticketTypeId: null };
-}
 
 const listParticipantsInputSchema = z.object({
   page: z.number().min(1).default(1),
@@ -328,7 +248,8 @@ export const importParticipants = createServerFn({ method: 'POST' })
       }
 
       const resolutions = group.map((g) => ({
-        ...g,
+        rowNumber: g.rowNumber,
+        participant: g.p,
         ...resolveTicketTypeIdForImport(g.p, byLumaId, byName),
       }));
 
@@ -359,7 +280,7 @@ export const importParticipants = createServerFn({ method: 'POST' })
       const ticketTypeId = first.ticketTypeId;
 
       emailToCanonical.set(normalizedEmail, {
-        ...first.p,
+        ...first.participant,
         ticketTypeId,
         rowNumbers: resolutions.map((r) => r.rowNumber),
       });
@@ -424,12 +345,22 @@ export const importParticipants = createServerFn({ method: 'POST' })
           }
           return;
         }
-        toUpdate.push({
-          id: existing.id,
-          name: c.name,
-          lumaId: c.lumaId || null,
-          ticketTypeId: c.ticketTypeId,
-        });
+        const update = buildImportParticipantUpdate(
+          {
+            name: existing.name,
+            lumaId: existing.lumaId,
+            ticketTypeId: existing.ticketTypeId,
+          },
+          {
+            id: existing.id,
+            name: c.name,
+            lumaId: c.lumaId || null,
+            ticketTypeId: c.ticketTypeId,
+          }
+        );
+        if (update) {
+          toUpdate.push(update);
+        }
         return;
       }
 
