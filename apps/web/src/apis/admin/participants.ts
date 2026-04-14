@@ -30,6 +30,7 @@ import {
 import { and, asc, count, db, desc, eq, ilike, inArray, or, type SQL } from '@base/core/drizzle.server';
 
 import { requireAdmin } from '~/apis/auth';
+import { generateCheckedInParticipantsExportCSV } from '~/utils/csv-parser';
 
 const listParticipantsInputSchema = z.object({
   page: z.number().min(1).default(1),
@@ -117,6 +118,37 @@ export const listParticipants = createServerFn({ method: 'GET' })
       },
     };
   });
+
+export const exportCheckedInParticipantsCsv = createServerFn({ method: 'GET' }).handler(async () => {
+  await requireAdmin();
+
+  const rows = await db
+    .select({
+      email: UsersTable.email,
+      name: UsersTable.name,
+      participantType: UsersTable.participantType,
+      lumaId: UsersTable.lumaId,
+      lumaTicketTypeId: TicketTypesTable.lumaTicketTypeId,
+    })
+    .from(UsersTable)
+    .leftJoin(TicketTypesTable, eq(UsersTable.ticketTypeId, TicketTypesTable.id))
+    .where(
+      and(eq(UsersTable.status, ParticipantStatusEnum.checked_in), eq(UsersTable.role, UserRoleEnum.participant))
+    )
+    .orderBy(asc(UsersTable.email));
+
+  const csv = generateCheckedInParticipantsExportCSV(
+    rows.map((r) => ({
+      email: r.email,
+      name: r.name,
+      user_type: r.participantType,
+      luma_id: r.lumaId ?? '',
+      ticket_type_id: r.lumaTicketTypeId ?? '',
+    }))
+  );
+
+  return { csv, count: rows.length };
+});
 
 const createUserInputSchema = z.object({
   name: z.string().min(1, 'Name is required'),

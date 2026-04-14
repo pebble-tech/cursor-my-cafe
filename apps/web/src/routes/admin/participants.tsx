@@ -55,6 +55,7 @@ import { getWelcomeEmailStats, sendWelcomeEmailToUser, sendWelcomeEmails } from 
 import {
   createUser,
   deleteUser,
+  exportCheckedInParticipantsCsv,
   getOpsActivityLogs,
   getParticipantCheckinLogs,
   importParticipants,
@@ -353,6 +354,20 @@ function ParticipantsPage() {
     },
   });
 
+  const exportCheckedInMutation = useMutation({
+    mutationFn: () => exportCheckedInParticipantsCsv(),
+    onSuccess: (result) => {
+      const blob = new Blob([result.csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().slice(0, 10);
+      a.download = `checked-in-participants-${date}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+  });
+
   const sendEmailToUserMutation = useMutation({
     mutationFn: (userId: string) => sendWelcomeEmailToUser({ data: { userId } }),
     onSuccess: () => {
@@ -627,6 +642,20 @@ function ParticipantsPage() {
               )}
             </DialogContent>
           </Dialog>
+
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={exportCheckedInMutation.isPending}
+            onClick={() => exportCheckedInMutation.mutate()}
+          >
+            {exportCheckedInMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Export checked-in CSV
+          </Button>
 
           <Dialog
             open={importDialogOpen}

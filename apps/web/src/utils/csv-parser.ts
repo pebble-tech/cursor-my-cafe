@@ -1,6 +1,6 @@
 import Papa from 'papaparse';
 
-import { UserType } from '@base/core/config/constant';
+import { UserType, type ParticipantType } from '@base/core/config/constant';
 
 export type ParsedParticipant = {
   name: string;
@@ -142,6 +142,23 @@ export function generateSkippedRowsCSV(skippedRows: Array<{ row: number; email: 
   }));
 
   return Papa.unparse(data);
+}
+
+export type CheckedInParticipantExportRow = {
+  email: string;
+  name: string;
+  user_type: ParticipantType;
+  luma_id: string;
+  ticket_type_id: string;
+};
+
+const CHECKED_IN_EXPORT_COLUMNS = ['email', 'name', 'user_type', 'luma_id', 'ticket_type_id'] as const;
+
+export function generateCheckedInParticipantsExportCSV(rows: CheckedInParticipantExportRow[]): string {
+  if (rows.length === 0) {
+    return CHECKED_IN_EXPORT_COLUMNS.join(',');
+  }
+  return Papa.unparse(rows, { columns: [...CHECKED_IN_EXPORT_COLUMNS] });
 }
 
 export type ParsedCode = {
